@@ -11,6 +11,7 @@ export type Resource =
   | 'team_audit_log'
   | 'team_webhook'
   | 'team_payments'
+  | 'team_software'
   | 'team_api_key';
 
 type RolePermissions = {
@@ -75,6 +76,10 @@ export const permissions: RolePermissions = {
       resource: 'team_api_key',
       actions: '*',
     },
+    {
+      resource: 'team_software',
+      actions: '*',
+    },
   ],
   ADMIN: [
     {
@@ -107,6 +112,10 @@ export const permissions: RolePermissions = {
     },
     {
       resource: 'team_api_key',
+      actions: '*',
+    },
+    {
+      resource: 'team_software',
       actions: '*',
     },
   ],
