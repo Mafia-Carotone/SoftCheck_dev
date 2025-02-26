@@ -13,13 +13,13 @@ const TeamNavigation = ({ slug, activePathname }: NavigationItemsProps) => {
   const menus: MenuItem[] = [
     {
       name: t('add-software'),
-      href: `/teams/${slug}/add_sftware.tsx`,
+      href: `/teams/${slug}/add_software`,
       icon: DocumentCheckIcon,
       active: activePathname === `/teams/${slug}/add_sftware.tsx`,
     },
     { 
       name: t('approved-softwares'),
-      href: `/teams/${slug}/approved_softwares.tsx`,
+      href: `/teams/${slug}/approved_softwares`,
       icon: CircleStackIcon,
       active: activePathname === `/teams/${slug}/approved_softwares.tsx`,
     },
@@ -27,9 +27,7 @@ const TeamNavigation = ({ slug, activePathname }: NavigationItemsProps) => {
       name: t('settings'),
       href: `/teams/${slug}/settings`,
       icon: Cog6ToothIcon,
-      active:
-        activePathname?.startsWith(`/teams/${slug}`) &&
-        !activePathname.includes('products'),
+      active: activePathname === `/teams/${slug}/settings.tsx`,
     },
   ];
 

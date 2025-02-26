@@ -8,7 +8,7 @@ const Products: NextPageWithLayout = () => {
 
   return (
     <div className="p-3">
-      <p className="text-sm">{t('product-placeholder')}</p>
+      <p className="text-sm">{'approved softwares web page'}</p>
       <p className="text-sm">{t('product-placeholder')}</p>
     </div>
   );
