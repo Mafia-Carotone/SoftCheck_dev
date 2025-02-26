@@ -14,6 +14,16 @@ enum Role {
   MEMBER
 }
 
+model Software {
+  id                String  @id @default(uuid())
+  softwareName      String
+  windowsEXE        String
+  macosEXE          String
+  version           String
+  approvalDate      DateTime @default(now())
+  @@unique([id])
+}
+
 model Account {
   id                String  @id @default(uuid())
   userId            String
