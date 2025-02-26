@@ -3,7 +3,7 @@ import env from './env';
 
 const app = {
   version: packageInfo.version,
-  name: 'BoxyHQ',
+  name: 'SoftCheck',
   logoUrl: 'https://boxyhq.com/img/logo.png',
   url: env.appUrl,
 };
