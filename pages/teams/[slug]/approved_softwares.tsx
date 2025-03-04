@@ -48,19 +48,19 @@ const SoftwareTable = () => {
     }
 
     mutateSoftwareList();
-    toast.success(t('software-deleted'));
+    toast.success('software-deleted');
   };
 
   const cols = [
-    t('software-name'),
-    t('windows-exe'),
-    t('macos-exe'),
-    t('version'),
-    t('approval-date'),
+    'Software Name',
+    'windows-exe',
+    'macos-exe',
+    'version',
+    'approval-date',
   ];
 
   if (canAccess('team_software', ['delete'])) {
-    cols.push(t('actions'));
+    cols.push('actions');
   }
 
   return (
@@ -75,14 +75,14 @@ const SoftwareTable = () => {
             { text: software.softwareName, wrap: true },
             { text: software.windowsEXE || '-', wrap: true },
             { text: software.macosEXE || '-', wrap: true },
-            { text: software.Version, wrap: true },
+            { text: software.version, wrap: true },
             { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
             {
               buttons: canAccess('team_software', ['delete'])
                 ? [
                     {
                       color: 'error',
-                      text: t('remove'),
+                      text: 'remove',
                       onClick: () => {
                         setSelectedSoftware(software);
                         setConfirmationDialogVisible(true);
@@ -99,7 +99,7 @@ const SoftwareTable = () => {
         visible={confirmationDialogVisible}
         onCancel={() => setConfirmationDialogVisible(false)}
         onConfirm={() => removeSoftware(selectedSoftware)}
-        title={t('confirm-delete-software')}
+        title={'confirm-delete-software'}
       >
         {t('delete-software-warning', {
           name: selectedSoftware?.softwareName,
