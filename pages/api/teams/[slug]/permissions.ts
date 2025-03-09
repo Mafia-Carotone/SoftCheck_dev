@@ -18,7 +18,7 @@ export default async function handler(
         });
     }
   } catch (error: any) {
-    const message = error.message || 'Something went wrong';
+    const message = error.message || 'Something went wrong. Printed form teams/{}/permissions';
     const status = error.status || 500;
 
     res.status(status).json({ error: { message } });

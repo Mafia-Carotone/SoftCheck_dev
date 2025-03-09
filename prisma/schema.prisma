@@ -16,12 +16,13 @@ enum Role {
 
 model Software {
   id                String  @id @default(uuid())
+  teamId            String
   softwareName      String
   windowsEXE        String
   macosEXE          String
   version           String
   approvalDate      DateTime @default(now())
-  @@unique([id])
+  @@unique([id, teamId])
 }
 
 model Account {

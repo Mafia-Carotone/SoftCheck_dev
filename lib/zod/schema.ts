@@ -162,6 +162,10 @@ export const deleteMemberSchema = z.object({
   memberId,
 });
 
+export const deleteSoftwareSchema = z.object({
+  memberId,
+});
+
 // email or slug
 export const ssoVerifySchema = z
   .object({

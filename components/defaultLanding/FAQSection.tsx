@@ -12,8 +12,7 @@ const FAQSection = () => {
           {t('frequently-asked')}
         </h2>
         <p className="text-center text-xl">
-          Lorem Ipsum is simply dummy text of the printing and typesetting
-          industry.
+        Got questions? We’ve got answers. Check out our FAQs to learn more.
         </p>
         <div className="flex items-center justify-center">
           <div className="grid grid-cols-1 gap-2">

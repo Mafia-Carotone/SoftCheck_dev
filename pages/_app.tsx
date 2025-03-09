@@ -40,7 +40,7 @@ function MyApp({ Component, pageProps }: AppPropsWithLayout) {
     <>
       <Head>
         <title>{app.name}</title>
-        <link rel="icon" href="https://boxyhq.com/img/favicon.ico" />
+        <link rel="icon" href="https://i.postimg.cc/5y36hBk6/Untitled-Artwork-2.webp" />
       </Head>
       <SessionProvider session={session}>
         <Toaster toastOptions={{ duration: 4000 }} />

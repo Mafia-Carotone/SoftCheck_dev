@@ -9,7 +9,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'boxyhq.com',
+        hostname: 'i.postimg.cc',
       },
       {
         protocol: 'https',

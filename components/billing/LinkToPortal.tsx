@@ -22,7 +22,7 @@ const LinkToPortal = ({ team }: LinkToPortalProps) => {
 
     const response = await fetch(
       `/api/teams/${team.slug}/payments/create-portal-link`,
-      {
+      
         method: 'POST',
         headers: defaultHeaders,
         credentials: 'same-origin',

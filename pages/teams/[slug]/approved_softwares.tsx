@@ -10,6 +10,12 @@ import toast from 'react-hot-toast';
 import { useState } from 'react';
 import { Table } from '@/components/shared/table/Table';
 import ConfirmationDialog from '../../../components/shared/ConfirmationDialog';
+import { slug } from '@/lib/zod/primitives';
+
+// Definimos la interfaz para el formato específico de tu JSON
+interface SoftwareResponse {
+  data: Software[];
+}
 
 const SoftwareTable = () => {
   const { data: session } = useSession();
@@ -33,10 +39,17 @@ const SoftwareTable = () => {
     return null;
   }
 
+  // Asegúrate de que softwareList contenga los datos correctos
+  // Si useSoftwareList no está adaptado para manejar el formato {data: [...]}
+  // puedes modificar esta parte o modificar el hook
+
+  // Ejemplo de cómo podrías manejar el formato JSON si viene directo:
+  // const actualSoftwareList = softwareList.data  softwareList;
+
   const removeSoftware = async (software: Software | null) => {
     if (!software) return;
 
-    const response = await fetch(`/api/software/${software.id}`, {
+    const response = await fetch(`/api/teams/${slug}/softwaresoftware/${software.id}`, {
       method: 'DELETE',
     });
 
@@ -48,24 +61,24 @@ const SoftwareTable = () => {
     }
 
     mutateSoftwareList();
-    toast.success('software-deleted');
+    toast.success(t('software-deleted'));
   };
 
   const cols = [
-    'Software Name',
-    'windows-exe',
-    'macos-exe',
-    'version',
-    'approval-date',
+    t('Software-Name'),
+    t('windows-exe'),
+    t('macos-exe'),
+    t('version'),
+    t('approval-date'),
   ];
 
   if (canAccess('team_software', ['delete'])) {
-    cols.push('actions');
+    cols.push(t('actions'));
   }
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xl font-medium leading-none tracking-tight">{t('software-list')}</h2>
+      <h2 className="text-xl font-medium leading-none tracking-tight">{t('Software Database')}</h2>
 
       <Table
         cols={cols}
@@ -76,13 +89,16 @@ const SoftwareTable = () => {
             { text: software.windowsEXE || '-', wrap: true },
             { text: software.macosEXE || '-', wrap: true },
             { text: software.version, wrap: true },
-            { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
+            { 
+              text: new Date(software.approvalDate).toLocaleDateString(), 
+              wrap: true 
+            },
             {
               buttons: canAccess('team_software', ['delete'])
                 ? [
                     {
                       color: 'error',
-                      text: 'remove',
+                      text: t('remove'),
                       onClick: () => {
                         setSelectedSoftware(software);
                         setConfirmationDialogVisible(true);
@@ -99,7 +115,7 @@ const SoftwareTable = () => {
         visible={confirmationDialogVisible}
         onCancel={() => setConfirmationDialogVisible(false)}
         onConfirm={() => removeSoftware(selectedSoftware)}
-        title={'confirm-delete-software'}
+        title={t('confirm-delete-software')}
       >
         {t('delete-software-warning', {
           name: selectedSoftware?.softwareName,
