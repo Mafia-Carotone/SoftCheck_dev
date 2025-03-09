@@ -91,11 +91,13 @@ const Products: NextPageWithLayout = () => {
 
   // Función para reiniciar el cuestionario
   const resetQuiz = () => {
+    const generateRandomId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+
     setCurrentState(QuestionState.PRIVACY_POLICY);
     setAnswers({});
     setResult({ approved: '' });
     setSoftwareName('');
-    setID('');
+    setID(generateRandomId());
     setTeamID('');
     setWindowsEXE('');
     setMacosEXE('');

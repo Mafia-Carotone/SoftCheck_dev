@@ -49,15 +49,18 @@ const handleGET = async (req: NextApiRequest, res: NextApiResponse) => {
 
 // Create a software entry
 const handlePOST = async (req: NextApiRequest, res: NextApiResponse) => {
-  const { teamId, softwareName, windowsEXE, macosEXE, version, approvalDate } = req.body;
-
+  const { id, teamId, softwareName, windowsEXE, macosEXE, version, approvalDate } = req.body;
+  //3const team = await throwIfNoTeamAccess(req, res);
+  //teamId = team.teamId
   if (!teamId || !softwareName || !version) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+    return res.status(400).json({ error: `Faltan campos obligatorios. - ${softwareName} - ${version}` });
   }
 
   try {
+
     const newSoftware = await prisma.software.create({
       data: {
+        id,
         teamId,
         softwareName,
         windowsEXE: windowsEXE || null,
