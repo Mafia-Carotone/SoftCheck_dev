@@ -570,7 +570,7 @@ const Products: NextPageWithLayout = () => {
                   <p>{answers.vulnerabilidades_antiguas}</p>
                 </div>
                 <div className="p-3 border rounded">
-                  <p className="font-medium">Versiones troyanizadas:</p>
+                  <p className="font-medium">Versiones troyanizadas?</p>
                   <p>{answers.versiones_troyanizadas}</p>
                 </div>
               </div>
