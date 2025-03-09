@@ -33,14 +33,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         res.status(405).json({ error: { message: `Method ${method} Not Allowed` } });
     }
   } catch (error: any) {
-    const message = error.message || 'Something went wrong';
+    const message = error.message || 'Something went wrong.';
     const status = error.status || 500;
 
     res.status(status).json({ error: { message } });
   }
 }
 
-// Get all software entries
+// Get all software entries.
 const handleGET = async (req: NextApiRequest, res: NextApiResponse) => {
   const softwareList = await getAllSoftware();
 
