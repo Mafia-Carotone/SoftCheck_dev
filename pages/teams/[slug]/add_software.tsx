@@ -238,6 +238,8 @@ const Products: NextPageWithLayout = () => {
     // Por ejemplo, una llamada a una API o servicio
     console.log("Añadiendo software a la base de datos:", {
       nombre: softwareName,
+      id: softwareID,
+      teamID: softwareTeamID,
       respuestas: answers,
       aprobado: result.approved === "Si"
     });
