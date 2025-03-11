@@ -19,7 +19,9 @@ enum QuestionState {
   FRECUENCIA_UPDATE = 4,
   VULNERABILIDADES_ANTIGUAS = 5,
   VERSIONES_TROYANIZADAS = 6,
-  RESULT = 7
+  TERMS_OF_SERVICE = 7,
+  EULA = 8,
+  RESULT = 9
 }
 
 // Declarar jsPDF para TypeScript
@@ -277,6 +279,8 @@ const Products: NextPageWithLayout = () => {
       content += `Frecuencia de actualización: ${answers.frecuencia_update || "N/A"}\n`;
       content += `Vulnerabilidades antiguas: ${answers.vulnerabilidades_antiguas || "N/A"}\n`;
       content += `Versiones troyanizadas: ${answers.versiones_troyanizadas || "N/A"}\n`;
+      content += `Términos de servicio: ${answers.terms_of_service || "N/A"}\n`;
+      content += `EULA: ${answers.eula || "N/A"}\n`;
       content += "\n------------------------------------\n";
       content += `Fecha de evaluación: ${new Date().toLocaleDateString()}\n`;
       
@@ -303,7 +307,7 @@ const Products: NextPageWithLayout = () => {
   const renderProgress = () => {
     if (currentState === QuestionState.RESULT) return null;
     
-    const totalSteps = 7; // Total de preguntas
+    const totalSteps = 10; // Total de preguntas
     const currentStep = currentState + 1;
     const progressPercentage = (currentStep / totalSteps) * 100;
     
@@ -329,13 +333,13 @@ const Products: NextPageWithLayout = () => {
       case QuestionState.PRIVACY_POLICY:
         return (
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Tiene política de privacidad?</h3>
+            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">¿Tiene política de privacidad?</h3>
             <div className="space-y-3">
               {["Tiene", "No tiene"].map(option => (
                 <button
                   key={option}
                   onClick={() => handleAnswer('privacy_policy', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
+                  className="w-full p-3 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors text-gray-900 dark:text-white bg-white dark:bg-gray-800"
                 >
                   {option}
                 </button>
@@ -452,36 +456,66 @@ const Products: NextPageWithLayout = () => {
           </div>
         );
       
+      case QuestionState.TERMS_OF_SERVICE:
+        return (
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">¿Tiene términos de servicio?</h3>
+            <div className="space-y-3">
+              {["Tiene", "No tiene"].map(option => (
+                <button
+                  key={option}
+                  onClick={() => handleAnswer('terms_of_service', option)}
+                  className="w-full p-3 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case QuestionState.EULA:
+        return (
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">¿Tiene EULA?</h3>
+            <div className="space-y-3">
+              {["Tiene", "No tiene"].map(option => (
+                <button
+                  key={option}
+                  onClick={() => handleAnswer('eula', option)}
+                  className="w-full p-3 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      
       case QuestionState.RESULT:
         return (
-          <div className="max-w-lg mx-auto p-6 bg-white rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-center mb-6">Resultado de la evaluación</h2>
+          <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+            <h2 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">Resultado de la evaluación</h2>
             <div className="text-center mb-6">
               <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${
-                result.approved === "Si" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                result.approved === "Si" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
               } mb-4`}>
                 <span className="text-3xl font-bold">{result.approved}</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">
+              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
                 {result.approved === "Si" ? "Software Aprobado" : "Software No Aprobado"}
               </h3>
               {result.message && (
-                <p className="text-gray-700">{result.message}</p>
+                <p className="text-gray-700 dark:text-gray-300">{result.message}</p>
               )}
             </div>
             
             <div className="mb-4">
-              <h3 className="text-lg font-semibold mb-2">Descargar reporte:</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Descargar reporte:</h3>
               <div className="flex space-x-2">
-                <button 
-                  onClick={() => handleDownloadPDF()}
-                  className="flex-1 p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Descargar PDF
-                </button>
-                <button 
-                  onClick={() => handleDownloadTXT()}
-                  className="flex-1 p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                <button
+                  onClick={handleDownloadTXT}
+                  className="flex-1 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Descargar TXT
                 </button>
@@ -490,19 +524,17 @@ const Products: NextPageWithLayout = () => {
             
             {result.approved === "Si" && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3">Añadir a la base de datos:</h3>
+                <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Añadir a la base de datos:</h3>
                 {!addedToDatabase ? (
                   <div className="space-y-3">
-
-
                     <div className="flex flex-col">
-                      <label htmlFor="softwareName" className="mb-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="softwareName" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                         Nombre del software
                       </label>
                       <input
                         id="softwareName"
                         type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500"
+                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
                         placeholder="Introduzca el nombre del software"
                         value={softwareName}
                         onChange={(e) => setSoftwareName(e.target.value)}
@@ -510,13 +542,13 @@ const Products: NextPageWithLayout = () => {
                     </div>
 
                     <div className="flex flex-col">
-                      <label htmlFor="windowsEXE" className="mb-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="windowsEXE" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                         Ejecutable en Windows (.exe)
                       </label>
                       <input
                         id="windowsEXE"
                         type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500"
+                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
                         placeholder="Nombre del archivo .exe"
                         value={softwareWindowsEXE}
                         onChange={(e) => setWindowsEXE(e.target.value)}
@@ -524,13 +556,13 @@ const Products: NextPageWithLayout = () => {
                     </div>
 
                     <div className="flex flex-col">
-                      <label htmlFor="macosEXE" className="mb-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="macosEXE" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                         Ejecutable en MacOS (.dmg)
                       </label>
                       <input
                         id="macosEXE"
                         type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500"
+                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
                         placeholder="Nombre del archivo .dmg"
                         value={softwareMacosEXE}
                         onChange={(e) => setMacosEXE(e.target.value)}
@@ -538,19 +570,18 @@ const Products: NextPageWithLayout = () => {
                     </div>
 
                     <div className="flex flex-col">
-                      <label htmlFor="windowsEXE" className="mb-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="version" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                         Versión del software
                       </label>
                       <input
                         id="version"
                         type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500"
+                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
                         placeholder="Versión del software"
                         value={softwareVersion}
                         onChange={(e) => setVersion(e.target.value)}
                       />
                     </div>
-
 
                     <button
                       onClick={addToDatabase}
@@ -560,7 +591,7 @@ const Products: NextPageWithLayout = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="p-4 bg-green-100 text-green-800 rounded-lg">
+                  <div className="p-4 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 rounded-lg">
                     <p className="font-medium">¡Software añadido correctamente!</p>
                     <p className="text-sm mt-1">Se ha añadido "{softwareName}" a la base de datos.</p>
                   </div>
@@ -569,40 +600,48 @@ const Products: NextPageWithLayout = () => {
             )}
             
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Resumen de respuestas:</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Resumen de respuestas:</h3>
               <div className="space-y-2">
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Política de privacidad:</p>
-                  <p>{answers.privacy_policy}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Política de privacidad:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.privacy_policy}</p>
                 </div>
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Certificaciones de seguridad:</p>
-                  <p>{answers.certificaciones_sec}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Términos de servicio:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.terms_of_service}</p>
                 </div>
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Vulnerabilidades activas:</p>
-                  <p>{answers.vulnerabilidades_activas}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">EULA:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.eula}</p>
                 </div>
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Desarrollador:</p>
-                  <p>{answers.quien_lo_desarrolla}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Certificaciones de seguridad:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.certificaciones_sec}</p>
                 </div>
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Frecuencia de actualización:</p>
-                  <p>{answers.frecuencia_update}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Vulnerabilidades activas:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.vulnerabilidades_activas}</p>
                 </div>
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Vulnerabilidades antiguas:</p>
-                  <p>{answers.vulnerabilidades_antiguas}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Desarrollador:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.quien_lo_desarrolla}</p>
                 </div>
-                <div className="p-3 border rounded">
-                  <p className="font-medium">Versiones troyanizadas???</p>
-                  <p>{answers.versiones_troyanizadas}</p>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Frecuencia de actualización:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.frecuencia_update}</p>
+                </div>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Vulnerabilidades antiguas:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.vulnerabilidades_antiguas}</p>
+                </div>
+                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-white">Versiones troyanizadas:</p>
+                  <p className="text-gray-700 dark:text-gray-300">{answers.versiones_troyanizadas}</p>
                 </div>
               </div>
             </div>
             
-            <button 
+            <button
               onClick={resetQuiz}
               className="w-full p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -618,10 +657,10 @@ const Products: NextPageWithLayout = () => {
 
   return (
     <div className="p-3">
-      <h1 className="text-2xl font-bold mb-4">Add a new software</h1>
-      <p className="text-sm mb-6">Completa el siguiente cuestionario para evaluar si el software puede ser añadido.</p>
+      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Add a new software</h1>
+      <p className="text-sm mb-6 text-gray-700 dark:text-gray-300">Completa el siguiente cuestionario para evaluar si el software puede ser añadido.</p>
       
-      <div className="max-w-lg mx-auto p-6 bg-white rounded-lg shadow-md">
+      <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
         {renderProgress()}
         {renderQuestion()}
       </div>
