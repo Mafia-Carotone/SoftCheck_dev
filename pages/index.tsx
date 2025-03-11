@@ -14,7 +14,6 @@ import Head from 'next/head';
 import Image from 'next/image';
 import app from '@/lib/app';
 import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
-import LanguageSelector from '@/components/shared/LanguageSelector';
 
 const Home: NextPageWithLayout = () => {
   const { t } = useTranslation('common');
@@ -72,7 +71,6 @@ const Home: NextPageWithLayout = () => {
                   </Link>
                 </li>
               </ul>
-              <LanguageSelector />
             </div>
           </div>
         </div>
