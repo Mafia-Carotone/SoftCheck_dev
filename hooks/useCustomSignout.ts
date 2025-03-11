@@ -6,6 +6,9 @@ export function useCustomSignOut() {
 
   const signOut = async () => {
     try {
+      // Guardar el tema actual antes de limpiar
+      const savedTheme = localStorage.getItem('theme');
+
       // Primero, llamar a signOut de next-auth
       await nextAuthSignOut({ redirect: false });
 
@@ -24,6 +27,11 @@ export function useCustomSignOut() {
       // Limpiar el estado del cliente
       window.localStorage.clear();
       window.sessionStorage.clear();
+
+      // Restaurar la preferencia del tema
+      if (savedTheme) {
+        localStorage.setItem('theme', savedTheme);
+      }
 
       // Limpiar cookies manualmente desde el cliente también
       document.cookie.split(';').forEach(cookie => {

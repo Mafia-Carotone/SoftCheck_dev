@@ -1,6 +1,9 @@
 import app from '@/lib/app';
 import { useTranslation } from 'next-i18next';
 import Image from 'next/image';
+import useTheme from 'hooks/useTheme';
+import { useEffect } from 'react';
+import Link from 'next/link';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -14,25 +17,37 @@ export default function AuthLayout({
   description,
 }: AuthLayoutProps) {
   const { t } = useTranslation('common');
+  const { theme } = useTheme();
+
+  // Aplicar el tema cuando el componente se monta
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(savedTheme);
+    }
+  }, []);
 
   return (
     <>
       <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-20 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-          <Image
-            src={app.logoUrl}
-            className="mx-auto h-12"
-            alt={app.name}
-            width={48}
-            height={48}
-          />
+          <Link href="/" className="block">
+            <Image
+              src={app.logoUrl}
+              className="mx-auto h-12 transition-transform hover:scale-110"
+              alt={app.name}
+              width={48}
+              height={48}
+            />
+          </Link>
           {heading && (
-            <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
+            <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900 dark:text-white">
               {t(heading)}
             </h2>
           )}
           {description && (
-            <p className="text-center text-gray-600 dark:text-white">
+            <p className="text-center text-gray-600 dark:text-gray-300">
               {t(description)}
             </p>
           )}

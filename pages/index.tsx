@@ -13,10 +13,15 @@ import env from '@/lib/env';
 import Head from 'next/head';
 import Image from 'next/image';
 import app from '@/lib/app';
+import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import LanguageSelector from '@/components/shared/LanguageSelector';
 
 const Home: NextPageWithLayout = () => {
-  const { toggleTheme, selectedTheme } = useTheme();
   const { t } = useTranslation('common');
+  const { theme, toggleTheme } = useTheme();
+  const selectedTheme = theme === 'dark' ? 
+    { icon: SunIcon } : 
+    { icon: MoonIcon };
 
   return (
     <>
@@ -38,34 +43,37 @@ const Home: NextPageWithLayout = () => {
             </Link>
           </div>
           <div className="flex-none">
-            <ul className="menu menu-horizontal flex items-center gap-2 sm:gap-4">
-              {env.darkModeEnabled && (
+            <div className="flex items-center gap-2 sm:gap-4">
+              <ul className="menu menu-horizontal flex items-center gap-2 sm:gap-4">
+                {env.darkModeEnabled && (
+                  <li>
+                    <button
+                      className="bg-none p-0 rounded-lg flex items-center justify-center"
+                      onClick={toggleTheme}
+                    >
+                      <selectedTheme.icon className="w-5 h-5" />
+                    </button>
+                  </li>
+                )}
                 <li>
-                  <button
-                    className="bg-none p-0 rounded-lg flex items-center justify-center"
-                    onClick={toggleTheme}
+                  <Link
+                    href="/auth/join"
+                    className="btn btn-primary btn-md py-3 px-2 sm:px-4 text-white"
                   >
-                    <selectedTheme.icon className="w-5 h-5" />
-                  </button>
+                    {t('sign-up')}
+                  </Link>
                 </li>
-              )}
-              <li>
-                <Link
-                  href="/auth/join"
-                  className="btn btn-primary btn-md py-3 px-2 sm:px-4 text-white"
-                >
-                  {t('sign-up')}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/auth/login"
-                  className="btn btn-primary dark:border-zinc-600 dark:border-2 dark:text-zinc-200 btn-outline py-3 px-2 sm:px-4 btn-md"
-                >
-                  {t('sign-in')}
-                </Link>
-              </li>
-            </ul>
+                <li>
+                  <Link
+                    href="/auth/login"
+                    className="btn btn-primary dark:border-zinc-600 dark:border-2 dark:text-zinc-200 btn-outline py-3 px-2 sm:px-4 btn-md"
+                  >
+                    {t('sign-in')}
+                  </Link>
+                </li>
+              </ul>
+              <LanguageSelector />
+            </div>
           </div>
         </div>
         <HeroSection />
