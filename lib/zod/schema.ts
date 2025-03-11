@@ -166,6 +166,17 @@ export const deleteSoftwareSchema = z.object({
   memberId,
 });
 
+export const createSoftwareSchema = z.object({
+  id: z.string(),
+  teamId: z.string().min(1, 'El ID del equipo es obligatorio'),
+  softwareName: z.string().min(1, 'El nombre del software es obligatorio'),
+  windowsEXE: z.string().nullable(),
+  macosEXE: z.string().nullable(),
+  version: z.string().min(1, 'La versión del software es obligatoria'),
+  answers: z.record(z.string()).default({}),
+  approved: z.boolean().default(false)
+});
+
 // email or slug
 export const ssoVerifySchema = z
   .object({

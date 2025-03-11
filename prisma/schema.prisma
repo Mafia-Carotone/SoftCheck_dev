@@ -15,14 +15,19 @@ enum Role {
 }
 
 model Software {
-  id                String  @id @default(uuid())
-  teamId            String
-  softwareName      String
-  windowsEXE        String
-  macosEXE          String
-  version           String
-  approvalDate      DateTime @default(now())
+  id                String    @id @default(uuid())
+  teamId           String
+  softwareName     String
+  windowsEXE       String?
+  macosEXE         String?
+  version          String
+  approvalDate     DateTime  @default(now())
+  answers          Json?     @default("{}")
+  approved         Boolean   @default(false)
+  team             Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
   @@unique([id, teamId])
+  @@index([teamId])
 }
 
 model Account {

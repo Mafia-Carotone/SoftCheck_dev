@@ -6,6 +6,9 @@ import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { slug } from '@/lib/zod/primitives';
+import { Team } from '@prisma/client';
+import { useRouter } from 'next/router';
+import { toast } from 'react-hot-toast';
 
 // Estado para controlar el flujo del cuestionario
 enum QuestionState {
@@ -42,16 +45,18 @@ interface jsPDF {
 
 const Products: NextPageWithLayout = () => {
   const { t } = useTranslation('common');
+  const router = useRouter();
   const [currentState, setCurrentState] = useState<QuestionState>(QuestionState.PRIVACY_POLICY);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<{ approved: string, message?: string }>({ approved: '' });
   const [softwareName, setSoftwareName] = useState<string>('');
-  const [softwareID, setID] = useState<string>('');
-  const [softwareTeamID, setTeamID] = useState<string>('');
+  const [softwareID, setID] = useState<string>(() => {
+    // Generar un ID único al inicio
+    return Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+  });
   const [softwareWindowsEXE, setWindowsEXE] = useState<string>('');
   const [softwareMacosEXE, setMacosEXE] = useState<string>('');
   const [softwareVersion, setVersion] = useState<string>('');
-  const [softwareApprovalDate, setApprovalDate] = useState<string>('');
   const [addedToDatabase, setAddedToDatabase] = useState<boolean>(false);
 
   // Función para avanzar al siguiente estado
@@ -89,20 +94,81 @@ const Products: NextPageWithLayout = () => {
     return { approved: "Si" };
   };
 
+  // Función para añadir el software a la base de datos
+  const addToDatabase = async () => {
+    if (!router.isReady) {
+      toast.error("Espere un momento mientras se carga la página");
+      return;
+    }
+
+    const teamSlug = router.query.slug;
+    console.log("Team slug:", teamSlug); // Debugging
+
+    if (!teamSlug || typeof teamSlug !== 'string') {
+      toast.error("Error: No se pudo determinar el equipo");
+      return;
+    }
+
+    // Validación de campos obligatorios
+    if (!softwareName || !softwareName.trim()) {
+      toast.error("El nombre del software es obligatorio");
+      return;
+    }
+
+    if (!softwareVersion || !softwareVersion.trim()) {
+      toast.error("La versión del software es obligatoria");
+      return;
+    }
+
+    // Construir el payload
+    const payload = {
+      id: softwareID,
+      softwareName: softwareName.trim(),
+      version: softwareVersion.trim(),
+      windowsEXE: softwareWindowsEXE?.trim() || null,
+      macosEXE: softwareMacosEXE?.trim() || null,
+      answers: answers,
+      approved: result.approved === "Si"
+    };
+
+    console.log("Sending payload:", payload); // Debugging
+
+    try {
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log("Response status:", response.status); // Debugging
+      const data = await response.json();
+      console.log("Response data:", data); // Debugging
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Error al añadir el software a la base de datos');
+      }
+
+      setAddedToDatabase(true);
+      toast.success('Software añadido con éxito');
+      
+    } catch (error: any) {
+      console.error('Error al crear software:', error);
+      toast.error(error.message || 'Error al conectar con la base de datos');
+    }
+  };
+
   // Función para reiniciar el cuestionario
   const resetQuiz = () => {
-    const generateRandomId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
-
     setCurrentState(QuestionState.PRIVACY_POLICY);
     setAnswers({});
     setResult({ approved: '' });
     setSoftwareName('');
-    setID(generateRandomId());
-    setTeamID('');
+    setID(Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join(''));
     setWindowsEXE('');
     setMacosEXE('');
     setVersion('');
-    setApprovalDate('');
     setAddedToDatabase(false);
   };
 
@@ -124,7 +190,7 @@ const Products: NextPageWithLayout = () => {
       setResult({ approved: aprobacion.approved, message: mensaje });
     }
   }, [currentState, answers]);
-
+/*
   // Función para descargar reporte en formato PDF
   const handleDownloadPDF = () => {
     try {
@@ -183,7 +249,7 @@ const Products: NextPageWithLayout = () => {
       alert("Hubo un error al generar el PDF. Por favor, inténtelo de nuevo.");
     }
   };
-  
+  */
   // Función para descargar reporte en formato TXT
   const handleDownloadTXT = () => {
     try {
@@ -224,56 +290,6 @@ const Products: NextPageWithLayout = () => {
     } catch (error) {
       console.error("Error al generar TXT:", error);
       alert("Hubo un error al generar el archivo TXT. Por favor, inténtelo de nuevo.");
-    }
-  };
-
-  // Función para añadir el software a la base de datos
-  const addToDatabase = async () => {
-    if (!softwareName.trim()) {
-      alert("Por favor, introduce un nombre para el software");
-      return;
-    }
-    
-    // Aquí iría la lógica para añadir el software a la base de datos
-    // Por ejemplo, una llamada a una API o servicio
-    console.log("Añadiendo software a la base de datos:", {
-      nombre: softwareName,
-      id: softwareID,
-      teamID: softwareTeamID,
-      respuestas: answers,
-      aprobado: result.approved === "Si"
-    });
-    
-    // Simulamos que se ha añadido correctamente
-    //setAddedToDatabase(true);
-    
-    // En un caso real, aquí se podría manejar la respuesta de la API:
-    try {
-      const response = await fetch(`/api/teams/${slug}/software`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: softwareID,
-          teamId: softwareTeamID, // Asegúrate de pasar el teamId correctamente
-          softwareName: softwareName,
-          windowsEXE: softwareWindowsEXE,
-          macosEXE: softwareMacosEXE,
-          version: softwareVersion,
-          approvalDate: new Date().toISOString(), // Formato de fecha ISO 8601
-        }),
-      });
-    
-      if (response.ok) {
-        setAddedToDatabase(true);
-        console.log('Software añadido con éxito');
-      } else {
-        const errorData = await response.json();
-        console.error('Error en la respuesta del servidor:', errorData);
-        alert('Error al añadir el software a la base de datos');
-      }
-    } catch (error) {
-      console.error('Error al conectar con la base de datos:', error);
-      alert('Error al conectar con la base de datos');
     }
   };
 
@@ -597,7 +613,7 @@ const Products: NextPageWithLayout = () => {
   return (
     <div className="p-3">
       <h1 className="text-2xl font-bold mb-4">Add a new software</h1>
-      <p className="text-sm mb-6">Complete el siguiente cuestionario para evaluar si el software puede ser añadido.</p>
+      <p className="text-sm mb-6">Completa el siguiente cuestionario para evaluar si el software puede ser añadido.</p>
       
       <div className="max-w-lg mx-auto p-6 bg-white rounded-lg shadow-md">
         {renderProgress()}

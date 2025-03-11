@@ -1,15 +1,11 @@
 import { ApiError } from '@/lib/errors';
 import { sendAudit } from '@/lib/retraced';
-import { getAllSoftware, deleteSoftware, updateSoftware } from 'models/software';
+import { createSoftware, getAllSoftware, deleteSoftware, updateSoftware } from 'models/software';
 import { prisma } from '@/lib/prisma';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { deleteSoftwareSchema, validateWithSchema } from '@/lib/zod';
-import { softwareSchema, updateSoftwareSchema } from '@/lib/schemas';
+import { createSoftwareSchema, validateWithSchema } from '@/lib/zod';
 import { recordMetric } from '@/lib/metrics';
-import { validateMembershipOperation } from '@/lib/rbac';
-import { sendEvent } from '@/lib/svix';
-import { throwIfNoTeamAccess, removeTeamMember } from 'models/team';
-import { throwIfNotAllowed } from 'models/user';
+import { throwIfNoTeamAccess } from 'models/team';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -40,85 +36,132 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// Get all software entries.
+// Get all software entries for a team
 const handleGET = async (req: NextApiRequest, res: NextApiResponse) => {
-  const softwareList = await getAllSoftware();
-
+  const teamMember = await throwIfNoTeamAccess(req, res);
+  const softwareList = await getAllSoftware(teamMember.teamId);
   res.status(200).json({ data: softwareList });
 };
 
 // Create a software entry
 const handlePOST = async (req: NextApiRequest, res: NextApiResponse) => {
-  const { id, teamId, softwareName, windowsEXE, macosEXE, version, approvalDate } = req.body;
-  //3const team = await throwIfNoTeamAccess(req, res);
-  //teamId = team.teamId
-  if (!teamId || !softwareName || !version) {
-    return res.status(400).json({ error: `Faltan campos obligatorios. - ${softwareName} - ${version}` });
-  }
-
   try {
+    const teamMember = await throwIfNoTeamAccess(req, res);
+    console.log("Team member:", teamMember); // Debugging
+    console.log("Request body:", req.body); // Debugging
 
-    const newSoftware = await prisma.software.create({
-      data: {
-        id,
-        teamId,
-        softwareName,
-        windowsEXE: windowsEXE || null,
-        macosEXE: macosEXE || null,
-        version,
-        approvalDate: approvalDate ? new Date(approvalDate) : new Date(),
-      },
+    if (!teamMember.teamId) {
+      throw new ApiError(400, 'No se pudo determinar el ID del equipo');
+    }
+
+    // Verificar que el cuerpo de la solicitud no esté vacío
+    if (!req.body || Object.keys(req.body).length === 0) {
+      throw new ApiError(400, 'El cuerpo de la solicitud está vacío');
+    }
+
+    // Verificar campos obligatorios manualmente
+    const { softwareName, version } = req.body;
+    if (!softwareName || typeof softwareName !== 'string' || !softwareName.trim()) {
+      throw new ApiError(400, 'El nombre del software es obligatorio');
+    }
+    if (!version || typeof version !== 'string' || !version.trim()) {
+      throw new ApiError(400, 'La versión del software es obligatoria');
+    }
+
+    // Validate request body against schema and add teamId
+    const validatedData = validateWithSchema(createSoftwareSchema, {
+      ...req.body,
+      // Asegurar que los campos opcionales tengan valores por defecto
+      windowsEXE: req.body.windowsEXE || null,
+      macosEXE: req.body.macosEXE || null,
+      answers: req.body.answers || {},
+      approved: req.body.approved || false
     });
 
-    res.status(201).json(newSoftware);
-  } catch (error) {
-    console.error('Error al crear software:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.log("Validated data:", validatedData); // Debugging
+
+    // Create the software with teamId
+    const newSoftware = await createSoftware({
+      ...validatedData,
+      teamId: teamMember.teamId // Asegurarnos de que el teamId se pasa correctamente
+    });
+
+    console.log("Created software:", newSoftware); // Debugging
+
+    // Register audit
+    await sendAudit({
+      action: 'software.create',
+      crud: 'c',
+      user: teamMember.user,
+      team: teamMember.team,
+      target: { id: newSoftware.id, type: 'software' }
+    });
+
+    // Record metric
+    await recordMetric('software.created');
+
+    res.status(201).json({ data: newSoftware });
+  } catch (error: any) {
+    console.error('Error creating software:', error);
+    
+    if (error instanceof ApiError) {
+      res.status(error.status).json({ error: { message: error.message } });
+      return;
+    }
+
+    if (error.code === 'P2002') {
+      res.status(409).json({ error: { message: 'Ya existe un software con ese ID para este equipo' } });
+      return;
+    }
+
+    res.status(500).json({ error: { message: error.message || 'Error al crear el software en la base de datos' } });
   }
 };
 
 // Delete a software entry
-const handleDELETE_antiguo = async (req: NextApiRequest, res: NextApiResponse) => {
-  const { id } = validateWithSchema(softwareSchema, req.query as { id: string });
-
-  await deleteSoftware(id);
-
-  res.status(200).json({ data: {} });
-};
-
-// Delete the software from a team.
 const handleDELETE = async (req: NextApiRequest, res: NextApiResponse) => {
   const teamMember = await throwIfNoTeamAccess(req, res);
-  throwIfNotAllowed(softwareSchema, 'softwareName', 'delete');
+  const { id } = req.query;
 
-  const { memberId } = validateWithSchema(
-    deleteMemberSchema,
-    req.query as { memberId: string }
-  );
+  if (typeof id !== 'string') {
+    throw new ApiError(400, 'ID inválido');
+  }
 
-  await validateMembershipOperation(memberId, teamMember);
-
-  const teamMemberRemoved = await removeTeamMember(teamMember.teamId, memberId);
-
-  await sendEvent(teamMember.teamId, 'member.removed', teamMemberRemoved);
-
-  sendAudit({
-    action: 'member.remove',
+  await deleteSoftware(id);
+  
+  await sendAudit({
+    action: 'software.delete',
     crud: 'd',
     user: teamMember.user,
     team: teamMember.team,
+    target: { id, type: 'software' }
   });
 
-  recordMetric('member.removed');
+  await recordMetric('software.deleted');
 
   res.status(200).json({ data: {} });
 };
 
 // Update a software entry
 const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
-  const { id, ...updateData } = validateWithSchema(updateSoftwareSchema, req.body);
+  const teamMember = await throwIfNoTeamAccess(req, res);
+  const { id } = req.query;
 
-  const updatedSoftware = await updateSoftware(id, updateData);
+  if (typeof id !== 'string') {
+    throw new ApiError(400, 'ID inválido');
+  }
+
+  const updatedSoftware = await updateSoftware(id, req.body);
+
+  await sendAudit({
+    action: 'software.update',
+    crud: 'u',
+    user: teamMember.user,
+    team: teamMember.team,
+    target: { id, type: 'software' }
+  });
+
+  await recordMetric('software.updated');
 
   res.status(200).json({ data: updatedSoftware });
 };
