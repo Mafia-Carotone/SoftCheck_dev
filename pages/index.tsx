@@ -11,6 +11,8 @@ import PricingSection from '@/components/defaultLanding/PricingSection';
 import useTheme from 'hooks/useTheme';
 import env from '@/lib/env';
 import Head from 'next/head';
+import Image from 'next/image';
+import app from '@/lib/app';
 
 const Home: NextPageWithLayout = () => {
   const { toggleTheme, selectedTheme } = useTheme();
@@ -25,8 +27,14 @@ const Home: NextPageWithLayout = () => {
       <div className="container mx-auto">
         <div className="navbar bg-base-100 px-0 sm:px-1">
           <div className="flex-1">
-            <Link href="/" className="btn btn-ghost text-xl normal-case">
-              SoftCheck
+            <Link href="/" className="btn btn-ghost text-xl normal-case flex items-center gap-2">
+              <Image
+                src={app.logoUrl}
+                alt={app.name}
+                width={30}
+                height={30}
+              />
+              {app.name}
             </Link>
           </div>
           <div className="flex-none">
