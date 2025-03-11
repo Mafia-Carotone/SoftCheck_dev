@@ -58,12 +58,35 @@ export const createSoftware = async (params: {
 };
 
 // Eliminar un software por ID
-export const deleteSoftware = async (id: string): Promise<void> => {
-  await prisma.software.delete({
-    where: {
-      id
+export const deleteSoftware = async (id: string, teamId: string): Promise<void> => {
+  try {
+    // Verificar que el software existe y pertenece al equipo
+    const software = await prisma.software.findFirst({
+      where: {
+        id,
+        teamId
+      }
+    });
+
+    if (!software) {
+      throw new ApiError(404, 'Software no encontrado o no pertenece a este equipo');
     }
-  });
+
+    // Eliminar el software
+    await prisma.software.delete({
+      where: {
+        id_teamId: {
+          id,
+          teamId
+        }
+      }
+    });
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Error al eliminar el software');
+  }
 };
 
 // Actualizar un software por ID

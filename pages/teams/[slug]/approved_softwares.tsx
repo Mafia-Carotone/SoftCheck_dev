@@ -6,18 +6,15 @@ import { useSession } from 'next-auth/react';
 import { useTranslation } from 'next-i18next';
 import { Button } from 'react-daisyui';
 import toast from 'react-hot-toast';
-
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { Table } from '@/components/shared/table/Table';
 import ConfirmationDialog from '../../../components/shared/ConfirmationDialog';
-import { slug } from '@/lib/zod/primitives';
-
-// Definimos la interfaz para el formato específico de tu JSON
-interface SoftwareResponse {
-  data: Software[];
-}
+import { GetServerSidePropsContext } from 'next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 const SoftwareTable = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const { t } = useTranslation('common');
   const { canAccess } = useCanAccess();
@@ -39,36 +36,43 @@ const SoftwareTable = () => {
     return null;
   }
 
-  // Asegúrate de que softwareList contenga los datos correctos
-  // Si useSoftwareList no está adaptado para manejar el formato {data: [...]}
-  // puedes modificar esta parte o modificar el hook
-
-  // Ejemplo de cómo podrías manejar el formato JSON si viene directo:
-  // const actualSoftwareList = softwareList.data  softwareList;
-
   const removeSoftware = async (software: Software | null) => {
     if (!software) return;
 
-    const response = await fetch(`/api/teams/${slug}/softwaresoftware/${software.id}`, {
-      method: 'DELETE',
-    });
+    const teamSlug = router.query.slug as string;
+    try {
+      console.log('Attempting to delete software:', { id: software.id, teamSlug }); // Debugging
 
-    const json = await response.json();
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: software.id })
+      });
 
-    if (!response.ok) {
-      toast.error(json.error.message);
-      return;
+      console.log('Delete response:', response.status); // Debugging
+
+      if (!response.ok) {
+        const json = await response.json();
+        throw new Error(json.error?.message || 'Error al eliminar el software');
+      }
+
+      mutateSoftwareList();
+      toast.success(t('software-deleted'));
+      setConfirmationDialogVisible(false);
+    } catch (error: any) {
+      console.error('Error deleting software:', error);
+      toast.error(error.message || 'Error al eliminar el software');
     }
-
-    mutateSoftwareList();
-    toast.success(t('software-deleted'));
   };
 
   const cols = [
-    t('Software-Name'),
+    t('name'),
     t('windows-exe'),
     t('macos-exe'),
     t('version'),
+    t('approved'),
     t('approval-date'),
   ];
 
@@ -78,7 +82,7 @@ const SoftwareTable = () => {
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xl font-medium leading-none tracking-tight">{t('Software Database')}</h2>
+      <h2 className="text-xl font-medium leading-none tracking-tight">{t('software-database')}</h2>
 
       <Table
         cols={cols}
@@ -89,13 +93,11 @@ const SoftwareTable = () => {
             { text: software.windowsEXE || '-', wrap: true },
             { text: software.macosEXE || '-', wrap: true },
             { text: software.version, wrap: true },
-            { 
-              text: new Date(software.approvalDate).toLocaleDateString(), 
-              wrap: true 
-            },
-            {
-              buttons: canAccess('team_software', ['delete'])
-                ? [
+            { text: software.approved ? t('yes') : t('no'), wrap: true },
+            { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
+            ...(canAccess('team_software', ['delete'])
+              ? [{
+                  buttons: [
                     {
                       color: 'error',
                       text: t('remove'),
@@ -104,9 +106,9 @@ const SoftwareTable = () => {
                         setConfirmationDialogVisible(true);
                       },
                     },
-                  ]
-                : [],
-            },
+                  ],
+                }]
+              : []),
           ],
         }))}
       />
@@ -124,5 +126,15 @@ const SoftwareTable = () => {
     </div>
   );
 };
+
+export async function getServerSideProps({
+  locale,
+}: GetServerSidePropsContext) {
+  return {
+    props: {
+      ...(locale ? await serverSideTranslations(locale, ['common']) : {}),
+    },
+  };
+}
 
 export default SoftwareTable;

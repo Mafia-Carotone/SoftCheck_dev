@@ -124,26 +124,43 @@ const handlePOST = async (req: NextApiRequest, res: NextApiResponse) => {
 
 // Delete a software entry
 const handleDELETE = async (req: NextApiRequest, res: NextApiResponse) => {
-  const teamMember = await throwIfNoTeamAccess(req, res);
-  const { id } = req.query;
+  try {
+    const teamMember = await throwIfNoTeamAccess(req, res);
+    
+    if (!teamMember.teamId) {
+      throw new ApiError(400, 'No se pudo determinar el ID del equipo');
+    }
 
-  if (typeof id !== 'string') {
-    throw new ApiError(400, 'ID inválido');
+    // Obtener el ID del software del body
+    const { id } = req.body;
+    
+    if (!id || typeof id !== 'string') {
+      throw new ApiError(400, 'ID de software inválido o no proporcionado');
+    }
+
+    console.log('Deleting software:', { id, teamId: teamMember.teamId }); // Debugging
+
+    await deleteSoftware(id, teamMember.teamId);
+    
+    await sendAudit({
+      action: 'software.delete',
+      crud: 'd',
+      user: teamMember.user,
+      team: teamMember.team,
+      target: { id, type: 'software' }
+    });
+
+    await recordMetric('software.deleted');
+
+    res.status(200).json({ data: {} });
+  } catch (error: any) {
+    console.error('Error in handleDELETE:', error); // Debugging
+    if (error instanceof ApiError) {
+      res.status(error.status).json({ error: { message: error.message } });
+      return;
+    }
+    res.status(500).json({ error: { message: error.message || 'Error al eliminar el software' } });
   }
-
-  await deleteSoftware(id);
-  
-  await sendAudit({
-    action: 'software.delete',
-    crud: 'd',
-    user: teamMember.user,
-    team: teamMember.team,
-    target: { id, type: 'software' }
-  });
-
-  await recordMetric('software.deleted');
-
-  res.status(200).json({ data: {} });
 };
 
 // Update a software entry

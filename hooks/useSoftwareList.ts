@@ -1,11 +1,31 @@
 import useSWR from 'swr';
 import { Software } from '@prisma/client';
-import { slug } from '@/lib/zod/primitives';
+import { useRouter } from 'next/router';
+
+interface ApiResponse<T> {
+  data: T;
+  error?: {
+    message: string;
+  };
+}
+
+interface SoftwareResponse {
+  data: Software[];
+  error?: {
+    message: string;
+  };
+}
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const useSoftwareList = () => {
-  const { data, error, mutate } = useSWR<Software[]>(`/api/teams/${slug}/software`, fetcher);
+  const router = useRouter();
+  const teamSlug = router.query.slug as string;
+  
+  const { data, error, mutate } = useSWR<SoftwareResponse>(
+    teamSlug ? `/api/teams/${teamSlug}/software` : null,
+    fetcher
+  );
 
   return {
     softwareList: data?.data || [],
