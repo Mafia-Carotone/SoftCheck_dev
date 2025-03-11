@@ -60,7 +60,10 @@ const handlePOST = async (req: NextApiRequest, res: NextApiResponse) => {
     }
 
     // Verificar campos obligatorios manualmente
-    const { softwareName, version } = req.body;
+    const { id, softwareName, version } = req.body;
+    if (!id) {
+      throw new ApiError(400, 'El ID del software es obligatorio');
+    }
     if (!softwareName || typeof softwareName !== 'string' || !softwareName.trim()) {
       throw new ApiError(400, 'El nombre del software es obligatorio');
     }
@@ -71,6 +74,7 @@ const handlePOST = async (req: NextApiRequest, res: NextApiResponse) => {
     // Validate request body against schema and add teamId
     const validatedData = validateWithSchema(createSoftwareSchema, {
       ...req.body,
+      teamId: teamMember.teamId, // Usar el teamId del miembro del equipo
       // Asegurar que los campos opcionales tengan valores por defecto
       windowsEXE: req.body.windowsEXE || null,
       macosEXE: req.body.macosEXE || null,

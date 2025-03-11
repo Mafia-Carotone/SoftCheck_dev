@@ -120,6 +120,11 @@ const Products: NextPageWithLayout = () => {
       return;
     }
 
+    if (!softwareID) {
+      toast.error("Error: No se pudo generar el ID del software");
+      return;
+    }
+
     // Construir el payload
     const payload = {
       id: softwareID,
@@ -127,8 +132,9 @@ const Products: NextPageWithLayout = () => {
       version: softwareVersion.trim(),
       windowsEXE: softwareWindowsEXE?.trim() || null,
       macosEXE: softwareMacosEXE?.trim() || null,
-      answers: answers,
-      approved: result.approved === "Si"
+      answers: answers || {},
+      approved: result.approved === "Si",
+      teamId: teamSlug // Añadir el teamId usando el slug
     };
 
     console.log("Sending payload:", payload); // Debugging
@@ -590,7 +596,7 @@ const Products: NextPageWithLayout = () => {
                   <p>{answers.vulnerabilidades_antiguas}</p>
                 </div>
                 <div className="p-3 border rounded">
-                  <p className="font-medium">Versiones troyanizadas?</p>
+                  <p className="font-medium">Versiones troyanizadas???</p>
                   <p>{answers.versiones_troyanizadas}</p>
                 </div>
               </div>
