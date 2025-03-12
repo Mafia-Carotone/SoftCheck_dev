@@ -97,10 +97,12 @@ const SoftwareTable = () => {
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xl font-medium leading-none tracking-tight">{t('software-database')}</h2>
-      <Button color="primary" onClick={downloadExcel} className="mb-4">
-        {t('download-excel')}
-      </Button>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-medium leading-none tracking-tight">{t('software-database')}</h2>
+        <Button className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 py-2 px-4" onClick={downloadExcel}>
+          {t('download-excel')}
+        </Button>
+      </div>
       <Table
         cols={cols}
         body={softwareList.map((software) => ({
