@@ -53,6 +53,7 @@
     "next-auth": "4.24.11",
     "next-i18next": "15.4.2",
     "nodemailer": "6.10.0",
+    "pdf-lib": "^1.17.1",
     "react": "18.3.1",
     "react-daisyui": "5.0.5",
     "react-dom": "18.3.1",

@@ -3,12 +3,16 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import type { NextPageWithLayout } from 'types';
 import { useTranslation } from 'next-i18next';
 import React, { useState, useEffect } from 'react';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { slug } from '@/lib/zod/primitives';
 import { Team } from '@prisma/client';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
+import { PDFDocument, rgb } from 'pdf-lib';
+
+// Extender jsPDF con autoTable
+(jsPDF as any).API.autoTable = autoTable;
 
 // Estado para controlar el flujo del cuestionario
 enum QuestionState {
@@ -19,30 +23,7 @@ enum QuestionState {
   FRECUENCIA_UPDATE = 4,
   VULNERABILIDADES_ANTIGUAS = 5,
   VERSIONES_TROYANIZADAS = 6,
-  TERMS_OF_SERVICE = 7,
-  EULA = 8,
-  RESULT = 9
-}
-
-// Declarar jsPDF para TypeScript
-declare global {
-  interface Window {
-    jspdf: any;
-  }
-}
-
-// Extender jsPDF para TypeScript
-interface jsPDF {
-  autoTable: (options: any) => jsPDF;
-  save: (filename: string) => void;
-  internal: {
-    pageSize: {
-      width: number;
-      height: number;
-    };
-    getNumberOfPages: () => number;
-  };
-  setPage: (pageNumber: number) => void;
+  RESULT = 7
 }
 
 const Products: NextPageWithLayout = () => {
@@ -198,25 +179,40 @@ const Products: NextPageWithLayout = () => {
       setResult({ approved: aprobacion.approved, message: mensaje });
     }
   }, [currentState, answers]);
-/*
+
   // Función para descargar reporte en formato PDF
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     try {
-      // @ts-ignore - Necesario porque jsPDF y jspdf-autotable no tienen tipos TS definidos completamente
-      const doc = new jsPDF();
-      
+      // Crear un nuevo documento PDF
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([600, 400]);
+      const { width, height } = page.getSize();
+
       // Título y subtítulo
-      doc.setFontSize(18);
-      doc.text("Evaluación de Software", 14, 20);
-      
-      doc.setFontSize(12);
+      page.drawText('Evaluación de Software', {
+        x: 50,
+        y: height - 50,
+        size: 18,
+        color: rgb(0, 0, 0),
+      });
+
       const resultadoText = `Resultado: ${result.approved === "Si" ? "APROBADO" : "NO APROBADO"}`;
-      doc.text(resultadoText, 14, 30);
-      
+      page.drawText(resultadoText, {
+        x: 50,
+        y: height - 80,
+        size: 12,
+        color: rgb(0, 0, 0),
+      });
+
       if (result.message) {
-        doc.text(`Comentario: ${result.message}`, 14, 38);
+        page.drawText(`Comentario: ${result.message}`, {
+          x: 50,
+          y: height - 100,
+          size: 12,
+          color: rgb(0, 0, 0),
+        });
       }
-      
+
       // Datos para la tabla
       const tableData = [
         ["Política de privacidad", answers.privacy_policy || "N/A"],
@@ -227,37 +223,38 @@ const Products: NextPageWithLayout = () => {
         ["Vulnerabilidades antiguas", answers.vulnerabilidades_antiguas || "N/A"],
         ["Versiones troyanizadas", answers.versiones_troyanizadas || "N/A"]
       ];
-      
-      // @ts-ignore - Necesario por el uso de autotable
-      doc.autoTable({
-        startY: 45,
-        head: [["Pregunta", "Respuesta"]],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [66, 133, 244] }
+
+      let yPosition = height - 130;
+      tableData.forEach(([question, answer]) => {
+        page.drawText(`${question}: ${answer}`, {
+          x: 50,
+          y: yPosition,
+          size: 10,
+          color: rgb(0, 0, 0),
+        });
+        yPosition -= 20;
       });
-      
-      // Agregar fecha al pie de página
-      const today = new Date();
-      const dateStr = today.toLocaleDateString();
-      const pageCount = doc.internal.getNumberOfPages();
-      
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(10);
-        doc.text(`Fecha de evaluación: ${dateStr}`, 14, doc.internal.pageSize.height - 10);
-        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
-      }
-      
+
       // Guardar PDF
-      doc.save("evaluacion_software.pdf");
-      
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'evaluacion_software.pdf';
+      link.click();
+
+      // Liberar el objeto URL
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 100);
+
     } catch (error) {
-      console.error("Error al generar PDF:", error);
-      alert("Hubo un error al generar el PDF. Por favor, inténtelo de nuevo.");
+      console.error('Error al generar PDF:', error);
+      alert('Hubo un error al generar el PDF. Por favor, inténtelo de nuevo.');
     }
   };
-  */
+  
   // Función para descargar reporte en formato TXT
   const handleDownloadTXT = () => {
     try {
@@ -279,8 +276,6 @@ const Products: NextPageWithLayout = () => {
       content += `Frecuencia de actualización: ${answers.frecuencia_update || "N/A"}\n`;
       content += `Vulnerabilidades antiguas: ${answers.vulnerabilidades_antiguas || "N/A"}\n`;
       content += `Versiones troyanizadas: ${answers.versiones_troyanizadas || "N/A"}\n`;
-      content += `Términos de servicio: ${answers.terms_of_service || "N/A"}\n`;
-      content += `EULA: ${answers.eula || "N/A"}\n`;
       content += "\n------------------------------------\n";
       content += `Fecha de evaluación: ${new Date().toLocaleDateString()}\n`;
       
@@ -307,7 +302,7 @@ const Products: NextPageWithLayout = () => {
   const renderProgress = () => {
     if (currentState === QuestionState.RESULT) return null;
     
-    const totalSteps = 10; // Total de preguntas
+    const totalSteps = 8; // Total de preguntas
     const currentStep = currentState + 1;
     const progressPercentage = (currentStep / totalSteps) * 100;
     
@@ -456,42 +451,6 @@ const Products: NextPageWithLayout = () => {
           </div>
         );
       
-      case QuestionState.TERMS_OF_SERVICE:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">¿Tiene términos de servicio?</h3>
-            <div className="space-y-3">
-              {["Tiene", "No tiene"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('terms_of_service', option)}
-                  className="w-full p-3 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case QuestionState.EULA:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">¿Tiene EULA?</h3>
-            <div className="space-y-3">
-              {["Tiene", "No tiene"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('eula', option)}
-                  className="w-full p-3 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
       case QuestionState.RESULT:
         return (
           <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
@@ -518,6 +477,12 @@ const Products: NextPageWithLayout = () => {
                   className="flex-1 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Descargar TXT
+                </button>
+                <button
+                  onClick={handleDownloadPDF}
+                  className="flex-1 p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Descargar PDF
                 </button>
               </div>
             </div>
