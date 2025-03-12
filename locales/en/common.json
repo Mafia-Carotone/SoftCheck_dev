@@ -265,5 +265,12 @@
   "save": "Save",
   "software-deleted": "Software deleted successfully",
   "confirm-delete-software": "Confirm deletion of software",
-  "delete-software-warning": "Are you sure you want to delete the software \"{{name}}\"? This action cannot be undone."
+  "delete-software-warning": "Are you sure you want to delete the software \"{{name}}\"? This action cannot be undone.",
+  "upload-excel": "Upload Excel",
+  "processing-excel": "Processing Excel file...",
+  "excel-empty": "The Excel file is empty",
+  "excel-invalid-format": "Invalid Excel format. The Excel must contain columns with 'process' and 'name' for software name and 'process' and 'user' for the user information.",
+  "excel-no-columns": "The Excel file has no columns or data structure could not be detected.",
+  "excel-processed": "Excel file processed successfully. Download will start automatically",
+  "excel-processing-error": "Error processing Excel file"
 }

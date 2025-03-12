@@ -265,5 +265,12 @@
   "save": "Guardar",
   "software-deleted": "Software eliminado correctamente",
   "confirm-delete-software": "Confirmar eliminación de software",
-  "delete-software-warning": "¿Está seguro de que desea eliminar el software \"{{name}}\"? Esta acción no se puede deshacer."
+  "delete-software-warning": "¿Está seguro de que desea eliminar el software \"{{name}}\"? Esta acción no se puede deshacer.",
+  "upload-excel": "Subir Excel",
+  "processing-excel": "Procesando archivo Excel...",
+  "excel-empty": "El archivo Excel está vacío",
+  "excel-invalid-format": "Formato de Excel inválido. El Excel debe contener columnas con 'process' y 'name' para el nombre del software y 'process' y 'user' para la información del usuario.",
+  "excel-no-columns": "El archivo Excel no tiene columnas o no se pudo detectar su estructura de datos.",
+  "excel-processed": "Archivo Excel procesado correctamente. La descarga comenzará automáticamente",
+  "excel-processing-error": "Error al procesar el archivo Excel"
 }

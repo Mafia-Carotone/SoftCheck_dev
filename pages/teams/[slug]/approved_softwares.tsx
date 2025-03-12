@@ -7,7 +7,7 @@ import { useTranslation } from 'next-i18next';
 import { Button, Modal, Form, Input, Checkbox } from 'react-daisyui';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Table } from '@/components/shared/table/Table';
 import ConfirmationDialog from '../../../components/shared/ConfirmationDialog';
 import { GetServerSidePropsContext } from 'next';
@@ -21,10 +21,12 @@ const SoftwareTable = () => {
   const { data: session } = useSession();
   const { t } = useTranslation('common');
   const { canAccess } = useCanAccess();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [confirmationDialogVisible, setConfirmationDialogVisible] = useState(false);
   const [selectedSoftware, setSelectedSoftware] = useState<Software | null>(null);
   const [addSoftwareModalVisible, setAddSoftwareModalVisible] = useState(false);
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
 
   const { isLoading, isError, softwareList, mutateSoftwareList } = useSoftwareList();
 
@@ -116,6 +118,107 @@ const SoftwareTable = () => {
     XLSX.writeFile(workbook, 'approved_software.xlsx');
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsProcessingExcel(true);
+      toast.loading(t('processing-excel'), { id: 'processing-excel' });
+      
+      // Leer el archivo Excel
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Obtener la primera hoja
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convertir a JSON
+        const excelData = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (!excelData || excelData.length === 0) {
+          toast.error(t('excel-empty'), { id: 'processing-excel' });
+          setIsProcessingExcel(false);
+          return;
+        }
+        
+        // Mostrar la estructura del primer elemento para depuración
+        console.log('Excel first row structure:', excelData[0]);
+        
+        // Verificar si el Excel tiene columnas
+        const firstRow = excelData[0] as any;
+        const columnKeys = Object.keys(firstRow);
+        
+        if (columnKeys.length === 0) {
+          console.error('Excel has no columns');
+          toast.error(t('excel-no-columns'), { id: 'processing-excel' });
+          setIsProcessingExcel(false);
+          return;
+        }
+        
+        console.log('Available columns in Excel:', columnKeys);
+        
+        // Buscar columnas que puedan contener nombres de software
+        let processNameKey = columnKeys.find(key => 
+          key.toLowerCase().includes('process.name') || 
+          (key.toLowerCase().includes('process') && key.toLowerCase().includes('name'))
+        );
+        
+        // Si no encuentra una columna de nombre, usa la primera columna disponible
+        if (!processNameKey) {
+          processNameKey = columnKeys[0];
+          console.log('Using first column as software name:', processNameKey);
+        }
+        
+        // Crear un mapa de software aprobado para búsqueda rápida
+        const approvedSoftwareMap = new Map();
+        softwareList.forEach(software => {
+          approvedSoftwareMap.set(software.softwareName.toLowerCase(), software.approved);
+        });
+        
+        // Agregar la columna "Approved"
+        const processedData = excelData.map((row: any) => {
+          const softwareName = row[processNameKey as string];
+          const isApproved = softwareName && 
+                           approvedSoftwareMap.has(String(softwareName).toLowerCase()) && 
+                           approvedSoftwareMap.get(String(softwareName).toLowerCase());
+          
+          return {
+            ...row,
+            'Approved': isApproved ? t('yes') : t('no')
+          };
+        });
+        
+        // Crear un nuevo Excel con los datos procesados
+        const newWorksheet = XLSX.utils.json_to_sheet(processedData);
+        const newWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Processed Software');
+        
+        // Descargar el nuevo Excel
+        XLSX.writeFile(newWorkbook, 'processed_software.xlsx');
+        
+        toast.success(t('excel-processed'), { id: 'processing-excel' });
+        setIsProcessingExcel(false);
+      };
+      
+      reader.readAsArrayBuffer(file);
+    } catch (error: any) {
+      console.error('Error processing Excel:', error);
+      toast.error(error.message || t('excel-processing-error'), { id: 'processing-excel' });
+      setIsProcessingExcel(false);
+    }
+    
+    // Limpiar el input para permitir subir el mismo archivo nuevamente
+    event.target.value = '';
+  };
+
   const cols = [
     t('name'),
     t('windows-exe'),
@@ -151,6 +254,20 @@ const SoftwareTable = () => {
               {t('add-software')}
             </Button>
           )}
+          <Button 
+            className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 py-2 px-4"
+            onClick={handleUploadClick}
+            disabled={isProcessingExcel}
+          >
+            {t('upload-excel')}
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".xlsx, .xls"
+            className="hidden"
+            onChange={handleFileChange}
+          />
           <Button 
             className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 py-2 px-4" 
             onClick={downloadExcel}
