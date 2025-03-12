@@ -248,5 +248,22 @@
   "internal-server-error": "Internal Server Error !",
   "unable-to-find": "We're unable to find out what's happening! We suggest you to",
   "try-again-later": "or visit here later.",
-  "multiple-sso-teams": "User belongs to multiple teams with SSO enabled. Please enter your team slug to get started."
+  "multiple-sso-teams": "User belongs to multiple teams with SSO enabled. Please enter your team slug to get started.",
+  "software-added": "Software added successfully",
+  "add-new-software": "Add New Software",
+  "name-required": "Name is required",
+  "version-required": "Version is required",
+  "windows-exe": "Windows executable",
+  "macos-exe": "MacOS executable",
+  "version": "Version",
+  "approved": "Approved",
+  "approval-date": "Approval Date",
+  "software-database": "Software Database",
+  "download-excel": "Download Excel",
+  "yes": "Yes",
+  "no": "No",
+  "save": "Save",
+  "software-deleted": "Software deleted successfully",
+  "confirm-delete-software": "Confirm deletion of software",
+  "delete-software-warning": "Are you sure you want to delete the software \"{{name}}\"? This action cannot be undone."
 }

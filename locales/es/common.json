@@ -248,5 +248,22 @@
   "internal-server-error": "¡Error interno del servidor!",
   "unable-to-find": "¡No podemos averiguar qué está pasando! Te sugerimos que",
   "try-again-later": "o visites aquí más tarde.",
-  "multiple-sso-teams": "El usuario pertenece a varios equipos con SSO habilitado. Introduce el slug de tu equipo para comenzar."
+  "multiple-sso-teams": "El usuario pertenece a varios equipos con SSO habilitado. Introduce el slug de tu equipo para comenzar.",
+  "software-added": "Software añadido correctamente",
+  "add-new-software": "Añadir Nuevo Software",
+  "name-required": "El nombre es obligatorio",
+  "version-required": "La versión es obligatoria",
+  "windows-exe": "Ejecutable Windows",
+  "macos-exe": "Ejecutable MacOS",
+  "version": "Versión",
+  "approved": "Aprobado",
+  "approval-date": "Fecha de Aprobación",
+  "software-database": "Base de datos de Software",
+  "download-excel": "Descargar Excel",
+  "yes": "Sí",
+  "no": "No",
+  "save": "Guardar",
+  "software-deleted": "Software eliminado correctamente",
+  "confirm-delete-software": "Confirmar eliminación de software",
+  "delete-software-warning": "¿Está seguro de que desea eliminar el software \"{{name}}\"? Esta acción no se puede deshacer."
 }
