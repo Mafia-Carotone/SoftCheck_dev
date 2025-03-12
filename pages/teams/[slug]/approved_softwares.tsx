@@ -12,6 +12,7 @@ import { Table } from '@/components/shared/table/Table';
 import ConfirmationDialog from '../../../components/shared/ConfirmationDialog';
 import { GetServerSidePropsContext } from 'next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import * as XLSX from 'xlsx';
 
 const SoftwareTable = () => {
   const router = useRouter();
@@ -67,6 +68,20 @@ const SoftwareTable = () => {
     }
   };
 
+  const downloadExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(softwareList.map(software => ({
+      Name: software.softwareName,
+      'Windows EXE': software.windowsEXE || '-',
+      'MacOS EXE': software.macosEXE || '-',
+      Version: software.version,
+      Approved: software.approved ? t('yes') : t('no'),
+      'Approval Date': new Date(software.approvalDate).toLocaleDateString(),
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Approved Software');
+    XLSX.writeFile(workbook, 'approved_software.xlsx');
+  };
+
   const cols = [
     t('name'),
     t('windows-exe'),
@@ -83,7 +98,9 @@ const SoftwareTable = () => {
   return (
     <div className="space-y-3">
       <h2 className="text-xl font-medium leading-none tracking-tight">{t('software-database')}</h2>
-
+      <Button color="primary" onClick={downloadExcel} className="mb-4">
+        {t('download-excel')}
+      </Button>
       <Table
         cols={cols}
         body={softwareList.map((software) => ({
