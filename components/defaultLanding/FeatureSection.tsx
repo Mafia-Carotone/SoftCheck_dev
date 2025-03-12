@@ -3,7 +3,7 @@ import { useTranslation } from 'next-i18next';
 const FeatureSection = () => {
   const { t } = useTranslation('common');
   return (
-    <section className="py-6 px-2">
+    <section className="py-6 lg:py-12 px-2">
       <div className="flex flex-col justify-center space-y-6">
         <h2 className="text-center text-4xl font-bold normal-case">
           {t('Demo')}

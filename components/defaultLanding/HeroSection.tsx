@@ -5,9 +5,9 @@ import { ShieldCheckIcon, CheckBadgeIcon, ArrowPathIcon } from '@heroicons/react
 const HeroSection = () => {
   const { t } = useTranslation('common');
   return (
-    <div className="relative min-h-[calc(100vh-1px)]">
+    <div className="relative min-h-[calc(12vh-1px)]">
       {/* Main content */}
-      <div className="hero-content text-center py-24">
+      <div className="hero-content text-center py-24 mx-auto mb-0">
         <div className="max-w-7xl">
           <h1 className="text-6xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
             Your Complete Security Solution
@@ -25,7 +25,7 @@ const HeroSection = () => {
           </div>
           
           {/* Featured characteristics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8 max-w-4xl mx-auto">
             <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <ShieldCheckIcon className="w-12 h-12 text-primary mb-4 mx-auto" />
               <h3 className="text-lg font-semibold mb-2">Guaranteed Protection</h3>
