@@ -20,7 +20,7 @@ const HeroSection = () => {
               href="/auth/join"
               className="btn btn-primary btn-lg px-8 no-underline hover:scale-105 transform transition-transform duration-200 shadow-lg hover:shadow-primary/20 text-white hover:text-white"
             >
-              {t('get-started')}
+              Comienza Ahora
             </Link>
           </div>
           
@@ -28,18 +28,18 @@ const HeroSection = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 max-w-4xl mx-auto">
             <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <ShieldCheckIcon className="w-12 h-12 text-primary mb-4 mx-auto" />
-              <h3 className="text-lg font-semibold mb-2">Seguridad Garantizada</h3>
-              <p className="text-gray-600 dark:text-gray-300">Evaluación automática de riesgos en software</p>
+              <h3 className="text-lg font-semibold mb-2">Protección Garantizada</h3>
+              <p className="text-gray-600 dark:text-gray-300">Detectamos y prevenimos riesgos antes de que afecten a tu empresa</p>
             </div>
             <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <CheckBadgeIcon className="w-12 h-12 text-primary mb-4 mx-auto" />
-              <h3 className="text-lg font-semibold mb-2">Aprobación Inteligente</h3>
-              <p className="text-gray-600 dark:text-gray-300">Proceso automatizado basado en políticas</p>
+              <h3 className="text-lg font-semibold mb-2">Decisiones Inteligentes</h3>
+              <p className="text-gray-600 dark:text-gray-300">Evaluamos cada software automáticamente para tu tranquilidad</p>
             </div>
             <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <ArrowPathIcon className="w-12 h-12 text-primary mb-4 mx-auto" />
-              <h3 className="text-lg font-semibold mb-2">Gestión Continua</h3>
-              <p className="text-gray-600 dark:text-gray-300">Monitoreo y actualización automática</p>
+              <h3 className="text-lg font-semibold mb-2">Siempre Actualizado</h3>
+              <p className="text-gray-600 dark:text-gray-300">Mantén tu software al día sin preocupaciones ni esfuerzos extras</p>
             </div>
           </div>
         </div>
