@@ -56,7 +56,7 @@ const SoftwareTable = () => {
 
       if (!response.ok) {
         const json = await response.json();
-        throw new Error(json.error?.message || 'Error al eliminar el software');
+        throw Error(json.error?.message || 'Error al eliminar el software');
       }
 
       mutateSoftwareList();
