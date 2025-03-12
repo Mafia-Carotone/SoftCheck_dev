@@ -15,18 +15,12 @@ const HeroSection = () => {
           <p className="py-6 text-2xl font-normal text-gray-700 dark:text-gray-300 max-w-3xl mx-auto">
             Automatiza la gestión de software empresarial. Mantén tu empresa segura y eficiente con un control total sobre las aplicaciones.
           </p>
-          <div className="flex items-center justify-center gap-4 mt-8">
+          <div className="flex items-center justify-center mt-8">
             <Link
               href="/auth/join"
               className="btn btn-primary btn-lg px-8 no-underline hover:scale-105 transform transition-transform duration-200 shadow-lg hover:shadow-primary/20 text-white hover:text-white"
             >
               {t('get-started')}
-            </Link>
-            <Link
-              href="https://github.com/boxyhq/saas-starter-kit"
-              className="btn btn-outline btn-lg px-8 hover:scale-105 transform transition-transform duration-200"
-            >
-              GitHub
             </Link>
           </div>
           
