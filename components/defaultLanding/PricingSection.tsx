@@ -64,7 +64,7 @@ const PricingSection = () => {
                     <div className="mt-8">
                       <Button
                         color={isPopular ? "primary" : "ghost"}
-                        className={`w-full py-4 rounded-xl font-semibold ${
+                        className={`w-full py-4 rounded-xl font-semibold text-white ${
                           isPopular ? 'shadow-lg hover:shadow-primary/50' : 'border-2'
                         }`}
                         size="lg"

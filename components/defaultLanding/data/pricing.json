@@ -15,7 +15,11 @@
     "currency": "USD",
     "duration": "year",
     "description": "Pro",
-    "benefits": ["Up to 3 users.", "100 Apporved Software storage", "15 Approval Requests /month"]
+    "benefits": [
+      "Up to 3 users.",
+      "100 Apporved Software storage",
+      "15 Approval Requests /month"
+    ]
   },
   {
     "amount": "???",
