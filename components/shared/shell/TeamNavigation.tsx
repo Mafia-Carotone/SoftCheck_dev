@@ -18,7 +18,7 @@ const TeamNavigation = ({ slug, activePathname }: NavigationItemsProps) => {
       active: activePathname === `/teams/${slug}/add_sftware.tsx`,
     },
     { 
-      name: t('approved-softwares'),
+      name: t('Software Database'),
       href: `/teams/${slug}/approved_softwares`,
       icon: CircleStackIcon,
       active: activePathname === `/teams/${slug}/approved_softwares.tsx`,

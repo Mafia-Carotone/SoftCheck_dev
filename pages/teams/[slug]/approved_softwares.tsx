@@ -244,14 +244,14 @@ const SoftwareTable = () => {
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-medium leading-none tracking-tight">{t('software-database')}</h2>
+        <h2 className="text-xl font-medium leading-none tracking-tight">{t('Software Database')}</h2>
         <div className="flex space-x-2">
           {canAccess('team_software', ['create']) && (
             <Button 
               className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 py-2 px-4" 
               onClick={() => setAddSoftwareModalVisible(true)}
             >
-              {t('add-software')}
+              {t('Add Software')}
             </Button>
           )}
           <Button 
@@ -259,7 +259,7 @@ const SoftwareTable = () => {
             onClick={handleUploadClick}
             disabled={isProcessingExcel}
           >
-            {t('upload-excel')}
+            {t('Upload Excel')}
           </Button>
           <input
             type="file"
@@ -272,7 +272,7 @@ const SoftwareTable = () => {
             className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 py-2 px-4" 
             onClick={downloadExcel}
           >
-            {t('download-excel')}
+            {t('Download Database')}
           </Button>
         </div>
       </div>
