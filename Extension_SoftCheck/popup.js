@@ -1,58 +1,104 @@
 const CONFIG = {
-  // URL base de la API
+  // URL base de la API - opciones ampliadas con más puertos y rutas
+  apiUrls: [
+    'http://localhost:80/api',      // Opción 1: API en puerto estándar HTTP (prioridad)
+    'http://localhost/api',         // Opción 2: API sin puerto (default 80)
+    'http://127.0.0.1:80/api',      // Opción 3: Usando IP explícita puerto 80
+    'http://127.0.0.1/api',         // Opción 4: IP sin puerto (default 80)
+    'http://localhost:3000/api',    // Opción 5: API en puerto Next.js desarrollo
+    'http://localhost:8000/api',    // Opción 6: Puerto alternativo común
+    'http://localhost:4000/api',    // Opción 7: Otro puerto común para APIs
+    'http://localhost:5000/api',    // Opción 8: Puerto 5000, común para APIs en Node/Express
+    'http://localhost/backend/api', // Opción 9: Subcarpeta backend
+    // Opciones basadas en la URL base sin sufijo /api
+    'http://localhost:80',          // Opción 10: Raíz del puerto 80
+    'http://localhost',             // Opción 11: Raíz sin puerto (default 80)
+    'http://localhost:3000',        // Opción 12: Raíz del puerto Next.js
+    'http://localhost:8080/api'     // Opción 13: Puerto 8080 común para desarrollo
+  ],
+  
+  // URL activa (se puede cambiar dinámicamente) - ahora puerto 80 por defecto
   apiUrl: 'http://localhost:80/api',
   
-  // Endpoints específicos
+  // Endpoints específicos con variantes para probar
   endpoints: {
     ping: '/ping',
     health: '/health',
-    softwareRequests: '/teams/{teamId}/software-requests'
+    // Múltiples posibles rutas para solicitudes de software
+    softwareRequestsOptions: [
+      '/software-requests',           // Opción estándar (priorizada)
+      '/api/software-requests',       // Con prefijo /api explícito
+      '/requests',                    // Sin prefijo "software"
+      '/api/requests',                // Sin prefijo "software" con /api
+      '/software-request',            // Singular
+      '/api/software-request',        // Singular con /api
+      '/request',                     // Singular sin prefijo
+      '/api/request',                 // Singular sin prefijo con /api
+      '/softwares',                   // Otra variante
+      '/api/softwares'                // Otra variante con /api
+    ],
+    // El endpoint predeterminado (se actualizará si se encuentra uno que funcione)
+    softwareRequests: '/software-requests',
+    auth: '/auth/signin'
   },
   
-  // ID del equipo por defecto
-  defaultTeamId: '1',
+  // ID del equipo para usar en la URL
+  // Este valor ahora se usará solo si es necesario, pero se evitará incluirlo en la URL
+  defaultTeamId: 'default-team',
   
   // Tiempo de espera para conexiones (en milisegundos)
   connectionTimeout: 5000,
   
-  // Opciones por defecto para fetch
+  // Opciones por defecto para fetch - configuración reforzada para JSON
   fetchOptions: {
     mode: 'cors',
     credentials: 'include',
     headers: {
       'Accept': 'application/json',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Connection': 'keep-alive',
+      'Cache-Control': 'no-cache'
     }
   }
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Verificar el estado del servidor
-  checkServerConnection();
+  // Añadir estilos CSS personalizados
+  addCustomStyles();
   
-  // Cargar configuración guardada
+  // Primero cargar la configuración guardada
   loadSavedConfig();
   
-  // Obtener elementos del DOM
-  const configSection = document.getElementById('config-section');
-  const downloadsSection = document.getElementById('downloads-section');
-  const apiKeyInput = document.getElementById('apiKey');
-  const saveConfigBtn = document.getElementById('saveConfigBtn');
-  const sendAllBtn = document.getElementById('sendAllBtn');
-  const statusDiv = document.getElementById('status');
-  
-  // Event listeners
-  saveConfigBtn.addEventListener('click', saveConfiguration);
-  sendAllBtn.addEventListener('click', sendAllDownloads);
-  
-  // Actualizar la interfaz según la configuración
-  updateUI();
-  
-  // Cargar y mostrar las descargas
-  loadPendingDownloads();
-  
-  // Actualizar las descargas cada 5 segundos
-  setInterval(loadPendingDownloads, 5000);
+  // Esperar un momento para asegurar que la configuración se haya cargado
+  setTimeout(function() {
+    // Actualizar la interfaz según la configuración
+    updateUI();
+    
+    // Actualizar la visualización de la API key
+    updateApiKeyDisplay();
+    
+    // Verificar el estado del servidor con la API key ya cargada
+    checkServerConnection();
+    
+    // Obtener elementos del DOM
+    const configSection = document.getElementById('config-section');
+    const downloadsSection = document.getElementById('downloads-section');
+    const apiKeyInput = document.getElementById('apiKey');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+    const sendAllBtn = document.getElementById('sendAllBtn');
+    const statusDiv = document.getElementById('status');
+    
+    // Event listeners
+    saveConfigBtn.addEventListener('click', saveConfiguration);
+    sendAllBtn.addEventListener('click', sendAllDownloads);
+    
+    // Cargar y mostrar las descargas
+    loadPendingDownloads();
+    
+    // Actualizar las descargas cada 5 segundos
+    setInterval(loadPendingDownloads, 5000);
+  }, 300); // Esperar 300ms para asegurar que la API key se haya guardado
 });
 
 // Actualizar la interfaz según si hay configuración o no
@@ -65,6 +111,52 @@ function updateUI() {
       // Hay configuración: mostrar sección de descargas
       configSection.style.display = 'none';
       downloadsSection.style.display = 'block';
+      
+      // Asegurarnos de que existe el botón de cambio de API key
+      let apiKeyButton = document.getElementById('changeApiKeyBtn');
+      
+      if (!apiKeyButton) {
+        // Crear el contenedor de acciones si no existe
+        let actionsContainer = document.getElementById('actions-container');
+        if (!actionsContainer) {
+          actionsContainer = document.createElement('div');
+          actionsContainer.id = 'actions-container';
+          actionsContainer.className = 'actions-bar';
+          
+          // Insertarlo al principio de la sección de descargas
+          downloadsSection.insertBefore(actionsContainer, downloadsSection.firstChild);
+        }
+        
+        // Crear el botón
+        apiKeyButton = document.createElement('button');
+        apiKeyButton.id = 'changeApiKeyBtn';
+        apiKeyButton.className = 'button secondary';
+        apiKeyButton.innerHTML = '<span style="margin-right: 5px;">🔑</span> Cambiar API Key';
+        
+        // Añadir el botón al contenedor
+        actionsContainer.appendChild(apiKeyButton);
+        
+        // Configurar evento
+        apiKeyButton.addEventListener('click', showApiKeyChangeDialog);
+      }
+      
+      // Mostrar la API key actual (parcialmente)
+      let currentApiKeyDisplay = document.getElementById('currentApiKeyDisplay');
+      if (!currentApiKeyDisplay) {
+        currentApiKeyDisplay = document.createElement('div');
+        currentApiKeyDisplay.id = 'currentApiKeyDisplay';
+        currentApiKeyDisplay.className = 'api-key-display';
+        
+        // Insertar después del botón
+        apiKeyButton.parentNode.insertBefore(currentApiKeyDisplay, apiKeyButton.nextSibling);
+      }
+      
+      // Mostrar parte de la API key
+      const apiKey = result.apiKey;
+      const displayKey = apiKey.length > 8 
+        ? apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4) 
+        : apiKey;
+      currentApiKeyDisplay.textContent = `API Key: ${displayKey}`;
     } else {
       // No hay configuración: mostrar sección de configuración
       configSection.style.display = 'block';
@@ -75,9 +167,55 @@ function updateUI() {
 
 // Cargar la configuración guardada
 function loadSavedConfig() {
-  chrome.storage.local.get(['apiKey'], function(result) {
+  chrome.storage.local.get(['apiKey', 'activeApiUrl'], function(result) {
     if (result.apiKey) {
       document.getElementById('apiKey').value = result.apiKey;
+    } else {
+      // Si no hay API key guardada, proponer una por defecto y guardarla directamente
+      const defaultApiKey = 'test-api-key';
+      document.getElementById('apiKey').value = defaultApiKey;
+      
+      // Guardar la API key por defecto para que esté disponible inmediatamente
+      chrome.storage.local.set({ apiKey: defaultApiKey }, function() {
+        console.log('🔑 API key por defecto guardada:', defaultApiKey);
+      });
+    }
+    
+    // Añadir un mensaje de ayuda sobre las API keys válidas
+    const apiKeyHelp = document.getElementById('apiKeyHelp');
+    if (apiKeyHelp) {
+      apiKeyHelp.innerHTML = 'API keys de prueba: test-api-key, dev-key, extension-key<br>O ingresa una API key real proporcionada por tu administrador.';
+    } else {
+      // Si no existe, crear el elemento de ayuda
+      const apiKeyInput = document.getElementById('apiKey');
+      if (apiKeyInput && apiKeyInput.parentNode) {
+        const helpText = document.createElement('div');
+        helpText.id = 'apiKeyHelp';
+        helpText.innerHTML = 'API keys de prueba: test-api-key, dev-key, extension-key<br>O ingresa una API key real proporcionada por tu administrador.';
+        helpText.style.fontSize = '12px';
+        helpText.style.color = '#666';
+        helpText.style.marginTop = '4px';
+        apiKeyInput.parentNode.insertBefore(helpText, apiKeyInput.nextSibling);
+      }
+    }
+    
+    // Si hay una URL activa guardada, actualizar CONFIG.apiUrl
+    if (result.activeApiUrl) {
+      CONFIG.apiUrl = result.activeApiUrl;
+      console.log('🔄 Cargada URL activa guardada:', CONFIG.apiUrl);
+    }
+    
+    // Si existe el selector de API URL (puede ser añadido después)
+    const apiUrlSelect = document.getElementById('apiUrlSelect');
+    if (apiUrlSelect) {
+      // Crear opciones para cada URL
+      CONFIG.apiUrls.forEach((url, index) => {
+        const option = document.createElement('option');
+        option.value = url;
+        option.textContent = `URL ${index + 1}: ${url}`;
+        option.selected = (url === CONFIG.apiUrl);
+        apiUrlSelect.appendChild(option);
+      });
     }
   });
 }
@@ -91,98 +229,236 @@ function saveConfiguration() {
     return;
   }
   
+  // Validar que la API key tiene un formato válido utilizando la función isValidApiKey
+  if (!isValidApiKey(apiKey)) {
+    showStatus('El formato de la API key no es válido. Debe tener al menos 8 caracteres y contener solo letras, números, guiones, puntos o guiones bajos.', 'error');
+    return;
+  }
+  
+  // Determinar si es una API key de prueba o real
+  const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
+  const isTestKey = testApiKeys.includes(apiKey);
+  
+  console.log(`🔑 ${isTestKey ? 'API Key de prueba' : 'API Key real'} guardada:`, apiKey);
+  console.log('💾 Longitud de API Key:', apiKey.length);
+  
+  // Verificar si se seleccionó una URL de API
+  let selectedApiUrl = CONFIG.apiUrl;
+  const apiUrlSelect = document.getElementById('apiUrlSelect');
+  if (apiUrlSelect) {
+    selectedApiUrl = apiUrlSelect.value;
+    CONFIG.apiUrl = selectedApiUrl;
+  }
+  
+  console.log('🌐 URL de API seleccionada:', selectedApiUrl);
+  
   // Guardar en el almacenamiento local
   chrome.storage.local.set({
     apiKey: apiKey,
-    selectedTeamId: CONFIG.defaultTeamId
+    activeApiUrl: selectedApiUrl
   }, function() {
     showStatus('Configuración guardada correctamente', 'success');
     // Actualizar la interfaz
     updateUI();
+    
+    // Verificar la conexión con la URL seleccionada
+    testApiUrls(CONFIG.apiUrls.indexOf(selectedApiUrl));
   });
 }
 
-// Verificar conexión con el servidor de manera proactiva
+// Función para iniciar el proceso de autenticación
+function initiateGithubAuth() {
+  const authUrl = `${CONFIG.apiUrl.replace('/api', '')}${CONFIG.endpoints.auth}`;
+  
+  // Abrir ventana de autenticación
+  chrome.windows.create({
+    url: authUrl,
+    type: 'popup',
+    width: 800,
+    height: 600
+  });
+}
+
+// Verificar conexión con el servidor
 function checkServerConnection() {
   showStatus('Verificando conexión con servidor...', 'info');
+  
+  console.log('🔄 Comprobando conexión a múltiples URLs posibles:', CONFIG.apiUrls);
+  
+  // Probar cada URL en secuencia hasta encontrar una que funcione
+  testApiUrls();
+}
 
-  chrome.storage.local.get(['apiKey'], function(result) {
-    const headers = {
-      ...CONFIG.fetchOptions.headers,
-      'Accept': 'text/plain'
-    };
-
-    if (result.apiKey) {
-      headers['Authorization'] = `Bearer ${result.apiKey}`;
+// Función para probar sistemáticamente todas las URLs de API configuradas
+function testApiUrls(currentIndex = 0) {
+  if (currentIndex >= CONFIG.apiUrls.length) {
+    console.error('❌ Ninguna URL de API funcionó. Verifica la configuración del servidor.');
+    connectionFailed('No se pudo conectar al servidor API. Verifica que el servidor API esté en ejecución en la URL correcta.');
+    return;
+  }
+  
+  // Obtener la URL actual para probar
+  const currentUrl = CONFIG.apiUrls[currentIndex];
+  const pingUrl = `${currentUrl}${CONFIG.endpoints.ping}`;
+  
+  console.log(`🔄 Probando URL #${currentIndex + 1}: ${pingUrl}`);
+  
+  // Encabezados explícitos para forzar respuesta JSON
+  const headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
+  };
+  
+  // Opciones específicas para solicitud de prueba
+  fetch(pingUrl, {
+    method: 'GET',
+    headers: headers,
+    mode: 'cors',
+    cache: 'no-cache',
+    credentials: 'same-origin',
+    redirect: 'follow'
+  })
+  .then(async response => {
+    console.log(`📩 Respuesta de ${pingUrl} - Status:`, response.status);
+    console.log(`📩 Tipo de contenido:`, response.headers.get('content-type'));
+    
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    
+    console.log(`📩 Respuesta de ${pingUrl}:`, text);
+    
+    // Verificar si recibimos HTML en lugar de la respuesta esperada
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html') || 
+        contentType.includes('text/html')) {
+      console.warn(`⚠️ La URL ${pingUrl} devolvió HTML en lugar de API JSON`);
+      throw new Error('Respuesta HTML recibida - Esta URL apunta a la aplicación web, no a la API');
     }
-
-    fetch(`${CONFIG.apiUrl}${CONFIG.endpoints.ping}`, {
-      ...CONFIG.fetchOptions,
-      method: 'GET',
-      headers
-    })
-    .then(async response => {
-      if (!response.ok) {
-        const text = await response.text();
-        console.error('Error response:', text);
-        try {
-          const errorData = JSON.parse(text);
-          if (errorData.error?.message === 'Unauthorized' || response.status === 401) {
-            throw new Error('API Key inválida o no autorizada');
-          }
-          throw new Error(errorData.error?.message || `Error ${response.status}: ${response.statusText}`);
-        } catch (e) {
-          throw new Error(`Error ${response.status}: ${text || response.statusText}`);
-        }
-      }
-      const text = await response.text();
-      console.log('Ping exitoso:', text);
-      connectionSuccess();
-    })
-    .catch(error => {
-      console.warn('Ping falló, intentando con API health:', error);
-      tryApiConnection();
+    
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${text || response.statusText}`);
+    }
+    
+    // Si llegamos aquí, la URL funciona
+    console.log(`✅ Conexión exitosa a ${pingUrl}:`, text);
+    
+    // Guardar esta URL como la activa
+    CONFIG.apiUrl = currentUrl;
+    chrome.storage.local.set({ 
+      serverConnected: true,
+      activeApiUrl: currentUrl
     });
+    
+    console.log('✅ URL de API válida encontrada y guardada:', currentUrl);
+    connectionSuccess();
+    
+    // Intentar health check ahora que tenemos una URL válida
+    tryApiConnection();
+  })
+  .catch(error => {
+    console.warn(`❌ Error al probar ${pingUrl}:`, error);
+    // Probar con la siguiente URL
+    testApiUrls(currentIndex + 1);
   });
 }
 
 // Intentar conectar directamente a la API
 function tryApiConnection() {
-  chrome.storage.local.get(['apiKey'], function(result) {
+  chrome.storage.local.get(['apiKey', 'activeApiUrl'], function(result) {
+    // Si no hay API key, intentar configurar una por defecto
+    if (!result.apiKey) {
+      console.warn('⚠️ No hay API key disponible para el health check. Configurando una por defecto.');
+      
+      // Configurar una API key por defecto
+      const defaultApiKey = 'test-api-key';
+      chrome.storage.local.set({ apiKey: defaultApiKey }, function() {
+        console.log('🔑 API key por defecto configurada:', defaultApiKey);
+        // Volver a intentar la conexión con la nueva API key
+        setTimeout(tryApiConnection, 100);
+      });
+      return;
+    }
+    
+    // Crear encabezados explícitos para API
     const headers = {
-      ...CONFIG.fetchOptions.headers,
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
     };
 
-    if (result.apiKey) {
-      headers['Authorization'] = `Bearer ${result.apiKey}`;
-    }
-
-    fetch(`${CONFIG.apiUrl}${CONFIG.endpoints.health}`, {
-      ...CONFIG.fetchOptions,
+    // Incluir la API key en los encabezados
+    headers['X-API-Key'] = result.apiKey;
+    console.log('🔑 Incluyendo API key en el health check:', result.apiKey.substring(0, 3) + '...');
+    
+    // Usar la URL que funcionó previamente si está disponible
+    const baseUrl = result.activeApiUrl || CONFIG.apiUrl;
+    const healthUrl = `${baseUrl}${CONFIG.endpoints.health}`;
+    
+    console.log('🔍 Intentando health check en:', healthUrl);
+    console.log('🔤 Usando encabezados:', headers);
+    
+    fetch(healthUrl, {
       method: 'GET',
-      headers
+      headers: headers,
+      mode: 'cors',
+      cache: 'no-cache',
+      credentials: 'same-origin',
+      redirect: 'follow'
     })
     .then(async response => {
+      console.log('📩 Health check status:', response.status);
+      console.log('📩 Tipo de contenido:', response.headers.get('content-type'));
+      
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      
+      console.log('📩 Respuesta de health check:', text);
+      
+      // Verificar si recibimos una página HTML en lugar de la respuesta esperada
+      if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html') || 
+          contentType.includes('text/html')) {
+        console.error('❌ Se recibió una página HTML en lugar de JSON');
+        
+        // Intentar otra URL
+        const currentIndex = CONFIG.apiUrls.indexOf(baseUrl);
+        if (currentIndex !== -1 && currentIndex + 1 < CONFIG.apiUrls.length) {
+          console.log('🔄 Cambiando a la siguiente URL y reintentando...');
+          testApiUrls(currentIndex + 1);
+          return;
+        }
+        
+        throw new Error('Endpoint incorrecto o servidor no está ejecutando la API correcta');
+      }
+      
       if (!response.ok) {
-        const text = await response.text();
-        console.error('Error response:', text);
         try {
           const errorData = JSON.parse(text);
-          if (errorData.error?.message === 'Unauthorized' || response.status === 401) {
-            throw new Error('API Key inválida o no autorizada');
-          }
           throw new Error(errorData.error?.message || `Error ${response.status}: ${response.statusText}`);
         } catch (e) {
+          if (e.message.includes('Unexpected token')) {
+            throw new Error(`Error ${response.status}: Respuesta no válida del servidor`);
+          }
           throw new Error(`Error ${response.status}: ${text || response.statusText}`);
         }
       }
-      const data = await response.json();
-      console.log('API health check exitoso:', data);
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Error parsing JSON response:', e, 'Response was:', text);
+        throw new Error('Respuesta del servidor no es JSON válido');
+      }
+      
+      console.log('✅ API health check exitoso:', data);
       connectionSuccess();
     })
     .catch(error => {
-      console.error('Todos los intentos de conexión fallaron:', error);
+      console.error('❌ Todos los intentos de conexión fallaron:', error);
       connectionFailed(error.message || 'Error de conexión: No se pudo conectar al servidor SoftCheck. Verifica que esté ejecutándose.');
     });
   });
@@ -220,9 +496,10 @@ function loadPendingDownloads() {
     const pendingCount = document.getElementById('pendingCount');
     const downloadsList = document.getElementById('downloads-list');
     
-    // Actualizar contador
+    // Actualizar contador - solo contar las que están en estado pendiente
+    const truePendingCount = pendingDownloads.filter(d => d.status === 'pending').length;
     if (pendingCount) {
-      pendingCount.textContent = pendingDownloads.length;
+      pendingCount.textContent = truePendingCount;
     }
     
     // Limpiar lista actual
@@ -256,20 +533,45 @@ function loadPendingDownloads() {
       // Origen de la descarga
       const source = download.downloadSource || 'Descarga directa';
       
+      // Estado formateado
+      let statusText = 'Pendiente';
+      let statusClass = 'status-pending';
+      
+      if (download.status === 'sent') {
+        statusText = 'Enviado - Pendiente de aprobación';
+        statusClass = 'status-sent';
+        
+        // Añadir fecha de envío si está disponible
+        if (download.sentAt) {
+          const sentDate = new Date(download.sentAt);
+          statusText += ` (${sentDate.toLocaleDateString()} ${sentDate.toLocaleTimeString()})`;
+        }
+      }
+      
       downloadItem.querySelector('.download-meta').innerHTML = `
         <div>${fileSize} • ${fileType}</div>
         <div>Origen: ${source}</div>
         <div>${formattedDate}</div>
+        <div class="${statusClass}">Estado: ${statusText}</div>
       `;
       
-      // Configurar botón de envío
+      // Configurar botón de envío - deshabilitarlo si ya fue enviado
       const sendButton = downloadItem.querySelector('.send-button');
-      sendButton.addEventListener('click', function() {
-        sendSoftwareRequest(index);
-      });
+      if (download.status === 'sent') {
+        sendButton.textContent = 'Enviado';
+        sendButton.disabled = true;
+        sendButton.classList.add('disabled');
+      } else {
+        sendButton.addEventListener('click', function() {
+          sendSoftwareRequest(index);
+        });
+      }
       
-      // Configurar botón de cancelación
+      // Configurar botón de cancelación - cambiar texto si fue enviado
       const cancelButton = downloadItem.querySelector('.cancel-button');
+      if (download.status === 'sent') {
+        cancelButton.textContent = 'Cancelar solicitud';
+      }
       cancelButton.addEventListener('click', function() {
         cancelDownload(index);
       });
@@ -282,106 +584,239 @@ function loadPendingDownloads() {
 
 // Enviar una solicitud de software específica
 function sendSoftwareRequest(index) {
-  chrome.storage.local.get(['apiKey', 'pendingDownloads'], function(result) {
+  chrome.storage.local.get(['apiKey', 'pendingDownloads', 'activeApiUrl'], function(result) {
     if (!result.apiKey) {
       showStatus('Configuración incompleta. Verifica tu API key.', 'error');
       return;
     }
     
-    const pendingDownloads = result.pendingDownloads || [];
+    console.log('🔑 API Key utilizada:', result.apiKey);
+    console.log('💾 Longitud de API Key:', result.apiKey.length);
     
-    if (index < 0 || index >= pendingDownloads.length) {
-      showStatus('Índice de descarga inválido.', 'error');
-      return;
-    }
-    
-    const download = pendingDownloads[index];
-    showStatus('Enviando solicitud...', 'info');
-    
-    const requestUrl = CONFIG.apiUrl + CONFIG.endpoints.softwareRequests.replace('{teamId}', CONFIG.defaultTeamId);
-    console.log('Enviando solicitud a:', requestUrl);
-    
-    const requestData = {
-      fileName: download.fileName || "NA",
-      fileSize: download.fileSize || 0,
-      fileUrl: download.fileUrl || "NA",
-      downloadSource: download.downloadSource || "NA",
-      status: 'pending'
-    };
-    
-    console.log('Datos a enviar:', requestData);
-    
-    fetch(requestUrl, {
-      ...CONFIG.fetchOptions,
-      method: 'POST',
-      headers: {
-        ...CONFIG.fetchOptions.headers,
-        'Authorization': `Bearer ${result.apiKey}`
-      },
-      body: JSON.stringify(requestData)
-    })
-    .then(async response => {
-      const text = await response.text();
-      console.log('Respuesta del servidor:', text);
+    // Verificar la API key antes de continuar
+    verifyApiKey(result.apiKey, function(isValid, message) {
+      if (!isValid) {
+        showStatus(`Error de autenticación: ${message}`, 'error');
+        return;
+      }
       
-      if (!response.ok) {
-        try {
-          const errorData = JSON.parse(text);
-          throw new Error(errorData.error?.message || `Error ${response.status}: ${response.statusText}`);
-        } catch (e) {
-          throw new Error(`Error ${response.status}: ${text || response.statusText}`);
+      const pendingDownloads = result.pendingDownloads || [];
+      
+      if (index < 0 || index >= pendingDownloads.length) {
+        showStatus('Índice de descarga inválido.', 'error');
+        return;
+      }
+      
+      const download = pendingDownloads[index];
+      
+      // No enviar si ya fue enviada previamente
+      if (download.status === 'sent') {
+        showStatus('Esta solicitud ya fue enviada y está pendiente de aprobación', 'info');
+        return;
+      }
+      
+      showStatus('Verificando endpoint de solicitudes...', 'info');
+      
+      // Usar la URL verificada que está almacenada
+      const baseUrl = result.activeApiUrl || CONFIG.apiUrl;
+      
+      // Primero buscar el endpoint correcto
+      findWorkingSoftwareRequestsEndpoint(baseUrl, result.apiKey, download, function(endpointFound) {
+        if (!endpointFound) {
+          showStatus('No se encontró un endpoint válido para solicitudes. Verifica la configuración del servidor.', 'error');
+          return;
         }
-      }
-      
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        console.error('Error parsing JSON response:', e);
-        throw new Error('Respuesta del servidor no válida');
-      }
-    })
-    .then(data => {
-      console.log('Respuesta exitosa:', data);
-      pendingDownloads.splice(index, 1);
-      
-      chrome.storage.local.set({ pendingDownloads: pendingDownloads }, function() {
-        showStatus('Solicitud enviada correctamente', 'success');
-        loadPendingDownloads();
+        
+        showStatus('Enviando solicitud...', 'info');
+        
+        // Construir la URL con el endpoint encontrado
+        const requestUrl = `${baseUrl}${CONFIG.endpoints.softwareRequests}`;
+        
+        console.log('📤 Enviando solicitud a:', requestUrl);
+        
+        const requestData = {
+          fileName: download.fileName || "NA",
+          fileSize: download.fileSize || 0,
+          fileUrl: download.fileUrl || "NA",
+          downloadSource: download.downloadSource || "NA",
+          status: 'pending',
+          notes: `Descarga detectada automáticamente por la extensión SoftCheck`
+          // No incluimos el teamId, ya que el backend lo determinará basado en la API key
+        };
+        
+        console.log('📦 Datos a enviar:', requestData);
+        
+        // Serializar a JSON explícitamente
+        const jsonData = JSON.stringify(requestData);
+        console.log('📝 JSON a enviar:', jsonData);
+        
+        // Crear los encabezados de manera explícita con la API key
+        const headers = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-API-Key': result.apiKey,
+          'X-Requested-With': 'XMLHttpRequest',
+          // Intenta evitar la caché y forzar el servidor a tratar la solicitud como API
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        };
+        
+        console.log('🔤 Encabezados de solicitud:', headers);
+        
+        // Enviar la solicitud al endpoint de API con opciones explícitas
+        fetch(requestUrl, {
+          method: 'POST',
+          headers: headers,
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'same-origin',
+          redirect: 'follow',
+          body: jsonData
+        })
+        .then(async response => {
+          console.log('📩 Respuesta recibida. Status:', response.status);
+          console.log('📩 Tipo de contenido:', response.headers.get('content-type'));
+          
+          const contentType = response.headers.get('content-type') || '';
+          const text = await response.text();
+          
+          console.log('📩 Respuesta como texto:', text.substring(0, 200) + (text.length > 200 ? '...' : ''));
+          
+          // Detectar específicamente respuestas HTML
+          if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html') || 
+              contentType.includes('text/html')) {
+            console.error('❌ Se recibió una respuesta HTML en lugar de JSON');
+            
+            // Extraer título de la página HTML si es posible
+            const titleMatch = text.match(/<title>(.*?)<\/title>/i);
+            const errorTitle = titleMatch ? titleMatch[1] : 'Página HTML recibida';
+            
+            // Intentar otra URL
+            console.log('🔄 Recibimos HTML, intentando con otra URL de API...');
+            
+            // Probar la siguiente URL en la lista
+            const currentIndex = CONFIG.apiUrls.indexOf(baseUrl);
+            if (currentIndex !== -1 && currentIndex + 1 < CONFIG.apiUrls.length) {
+              // Guardar la siguiente URL para intentar
+              const nextUrl = CONFIG.apiUrls[currentIndex + 1];
+              chrome.storage.local.set({ 
+                activeApiUrl: nextUrl,
+                // Borrar el endpoint encontrado para obligar a buscar uno nuevo con la nueva URL
+                workingSoftwareRequestsEndpoint: null
+              }, function() {
+                console.log('🔄 Cambiando a la siguiente URL de API:', nextUrl);
+                showStatus(`Reintentando con otra URL de API...`, 'info');
+                // Reintentar con la nueva URL
+                setTimeout(() => sendSoftwareRequest(index), 500);
+              });
+              return null; // No continuar con esta respuesta
+            }
+            
+            throw new Error(`URL incorrecta: Se recibió ${errorTitle}. Necesitas configurar la URL correcta de la API.`);
+          }
+          
+          if (!response.ok) {
+            try {
+              const errorData = JSON.parse(text);
+              console.error('❌ Error en formato JSON:', errorData);
+              throw new Error(errorData.error?.message || `Error ${response.status}: ${response.statusText}`);
+            } catch (e) {
+              console.error('❌ Error al analizar respuesta:', e);
+              if (e.message.includes('Unexpected token')) {
+                throw new Error(`Error ${response.status}: Respuesta no válida del servidor. Verifica que la API esté disponible.`);
+              }
+              throw new Error(`Error ${response.status}: ${text || response.statusText}`);
+            }
+          }
+          
+          let data;
+          try {
+            data = JSON.parse(text);
+            return data;
+          } catch (e) {
+            console.error('Error parsing JSON response:', e, 'Response was:', text);
+            throw new Error('Respuesta del servidor no es JSON válido. Verifica que estés conectando al endpoint correcto.');
+          }
+        })
+        .then(data => {
+          // Si recibimos null, es porque estamos reintentando con otra URL
+          if (data === null) return;
+          
+          console.log('📥 Respuesta exitosa:', data);
+          
+          // Actualizar estado de la descarga a "sent" en lugar de eliminarla
+          const updatedDownloads = [...pendingDownloads];
+          updatedDownloads[index] = {
+            ...updatedDownloads[index],
+            status: 'sent',
+            serverRequestId: data.id || null,
+            teamId: data.teamId || null, // Guardar el teamId devuelto por el servidor
+            sentAt: new Date().toISOString()
+          };
+          
+          chrome.storage.local.set({ pendingDownloads: updatedDownloads }, function() {
+            showStatus('Solicitud enviada correctamente. Estado: Pendiente de aprobación', 'success');
+            loadPendingDownloads();
+          });
+        })
+        .catch(error => {
+          console.error('❌ Error al enviar solicitud:', error);
+          showStatus(`Error: ${error.message || 'Error al enviar la solicitud'}`, 'error');
+        });
       });
-    })
-    .catch(error => {
-      console.error('Error al enviar solicitud:', error);
-      showStatus(`Error: ${error.message || 'Error al enviar la solicitud'}`, 'error');
     });
   });
 }
 
 // Enviar todas las descargas pendientes
 function sendAllDownloads() {
-  chrome.storage.local.get(['apiKey', 'selectedTeamId', 'pendingDownloads'], function(result) {
-    if (!result.apiKey || !result.selectedTeamId) {
-      showStatus('Configuración incompleta. Verifica tu API key y equipo.', 'error');
+  chrome.storage.local.get(['apiKey', 'pendingDownloads', 'activeApiUrl'], function(result) {
+    if (!result.apiKey) {
+      showStatus('Configuración incompleta. Verifica tu API key.', 'error');
       return;
     }
     
-    const pendingDownloads = result.pendingDownloads || [];
-    
-    if (pendingDownloads.length === 0) {
-      showStatus('No hay descargas pendientes para enviar', 'info');
-      return;
-    }
-    
-    // Enviar mensaje al background script
-    chrome.runtime.sendMessage({
-      action: 'checkDownloads',
-      teamId: result.selectedTeamId
-    }, function(response) {
-      if (response && response.success) {
-        showStatus(`Se enviaron ${response.sentCount} descargas para aprobación`, 'success');
-        loadPendingDownloads();
-      } else {
-        showStatus(response?.error || 'Error al enviar solicitudes', 'error');
+    // Verificar la API key antes de continuar
+    verifyApiKey(result.apiKey, function(isValid, message) {
+      if (!isValid) {
+        showStatus(`Error de autenticación: ${message}`, 'error');
+        return;
       }
+      
+      const pendingDownloads = result.pendingDownloads || [];
+      
+      if (pendingDownloads.length === 0) {
+        showStatus('No hay descargas pendientes para enviar', 'info');
+        return;
+      }
+      
+      // Obtener la URL base activa
+      const baseUrl = result.activeApiUrl || CONFIG.apiUrl;
+      
+      // Mostrar estado de búsqueda de endpoint
+      showStatus('Verificando endpoint de solicitudes...', 'info');
+      
+      // Buscar el endpoint correcto primero
+      findWorkingSoftwareRequestsEndpoint(baseUrl, result.apiKey, null, function(endpointFound) {
+        if (!endpointFound) {
+          showStatus('No se encontró un endpoint válido para solicitudes. Verifica la configuración del servidor.', 'error');
+          return;
+        }
+        
+        // Ahora enviar el mensaje al background script con la información actualizada del endpoint
+        chrome.runtime.sendMessage({
+          action: 'checkDownloads',
+          apiKey: result.apiKey,
+          softwareRequestsEndpoint: CONFIG.endpoints.softwareRequests // Pasar el endpoint encontrado
+        }, function(response) {
+          if (response && response.success) {
+            showStatus(`Se enviaron ${response.sentCount} descargas para aprobación`, 'success');
+            loadPendingDownloads();
+          } else {
+            showStatus(response?.error || 'Error al enviar solicitudes', 'error');
+          }
+        });
+      });
     });
   });
 }
@@ -412,7 +847,13 @@ function showStatus(message, type) {
 
 // Función para cancelar una descarga
 function cancelDownload(index) {
-  chrome.storage.local.get(['pendingDownloads'], function(result) {
+  chrome.storage.local.get(['pendingDownloads', 'apiKey', 'activeApiUrl'], function(result) {
+    if (!result.apiKey) {
+      showStatus('Configuración incompleta. Verifica tu API key.', 'error');
+      return;
+    }
+    
+    // Verificar la API key antes de continuar si la descarga ya fue enviada
     const pendingDownloads = result.pendingDownloads || [];
     
     if (index < 0 || index >= pendingDownloads.length) {
@@ -421,11 +862,600 @@ function cancelDownload(index) {
     }
     
     const download = pendingDownloads[index];
-    pendingDownloads.splice(index, 1);
     
-    chrome.storage.local.set({ pendingDownloads: pendingDownloads }, function() {
-      showStatus(`Se canceló la descarga: ${download.fileName}`, 'success');
-      loadPendingDownloads();
+    // Si la descarga ya fue enviada, tenemos que cancelarla en el servidor
+    if (download.status === 'sent' && download.serverRequestId) {
+      // En este caso necesitamos verificar la API key
+      verifyApiKey(result.apiKey, function(isValid, message) {
+        if (!isValid) {
+          showStatus(`Error de autenticación: ${message}`, 'error');
+          return;
+        }
+        
+        showStatus('Cancelando solicitud en el servidor...', 'info');
+        
+        // Usar la URL activa guardada
+        const baseUrl = result.activeApiUrl || CONFIG.apiUrl;
+        
+        // Construir la URL de cancelación (endpoint directo sin teamId)
+        const cancelUrl = `${baseUrl}/software-requests/${download.serverRequestId}`;
+        
+        console.log('🔄 Cancelando solicitud en:', cancelUrl);
+        
+        fetch(cancelUrl, {
+          ...CONFIG.fetchOptions,
+          method: 'DELETE',
+          headers: {
+            ...CONFIG.fetchOptions.headers,
+            'X-API-Key': result.apiKey
+          }
+        })
+        .then(async response => {
+          const text = await response.text();
+          console.log(`Respuesta cancelación: ${text}`);
+          
+          // Verificar si recibimos HTML
+          if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+            console.error('❌ Se recibió una página HTML en lugar de JSON');
+            throw new Error('URL incorrecta: Estás recibiendo una página web en lugar de la API');
+          }
+          
+          if (!response.ok) {
+            try {
+              const errorData = JSON.parse(text);
+              throw new Error(errorData.error?.message || `Error ${response.status}: ${response.statusText}`);
+            } catch (e) {
+              if (text.includes('<!DOCTYPE html>')) {
+                throw new Error(`Error ${response.status}: Endpoint no encontrado`);
+              }
+              throw new Error(`Error ${response.status}: ${text || response.statusText}`);
+            }
+          }
+          
+          // Eliminar la descarga del almacenamiento local
+          pendingDownloads.splice(index, 1);
+          chrome.storage.local.set({ pendingDownloads }, function() {
+            showStatus('Solicitud cancelada correctamente', 'success');
+            loadPendingDownloads();
+          });
+        })
+        .catch(error => {
+          console.error('Error al cancelar solicitud:', error);
+          showStatus(`Error: ${error.message || 'Error al cancelar la solicitud'}`, 'error');
+        });
+      });
+    } else {
+      // Si no fue enviada, simplemente eliminarla del almacenamiento local
+      pendingDownloads.splice(index, 1);
+      
+      chrome.storage.local.set({ pendingDownloads: pendingDownloads }, function() {
+        showStatus(`Se canceló la descarga: ${download.fileName}`, 'success');
+        loadPendingDownloads();
+      });
+    }
+  });
+}
+
+function loadTeams() {
+  console.log('Función loadTeams() implementada');
+  // Esta función ya no es necesaria porque el backend determina 
+  // el equipo a partir de la API key
+  return Promise.resolve();
+}
+
+// Función para probar distintos endpoints de software-requests
+function findWorkingSoftwareRequestsEndpoint(baseUrl, apiKey, testData, callback) {
+  console.log('🔍 Buscando endpoint de software-requests que funcione...');
+  
+  // Si ya se ha determinado previamente, usar ese
+  chrome.storage.local.get(['workingSoftwareRequestsEndpoint'], function(result) {
+    if (result.workingSoftwareRequestsEndpoint) {
+      console.log('✅ Usando endpoint guardado previamente:', result.workingSoftwareRequestsEndpoint);
+      CONFIG.endpoints.softwareRequests = result.workingSoftwareRequestsEndpoint;
+      callback(true);
+      return;
+    }
+    
+    // Datos de prueba simplificados
+    const sampleData = testData || {
+      fileName: "test-file.txt",
+      fileSize: 1024,
+      fileUrl: "https://example.com/test.txt",
+      downloadSource: "Test",
+      status: "pending",
+      notes: "Prueba para encontrar endpoint válido"
+    };
+    
+    // Función para probar cada endpoint secuencialmente
+    function tryEndpoint(index) {
+      if (index >= CONFIG.endpoints.softwareRequestsOptions.length) {
+        console.error('❌ No se encontró ningún endpoint válido para software-requests');
+        callback(false);
+        return;
+      }
+      
+      const currentEndpoint = CONFIG.endpoints.softwareRequestsOptions[index];
+      // Construir la URL sin incluir el ID del equipo en la ruta
+      const fullUrl = `${baseUrl}${currentEndpoint}`;
+      
+      console.log(`🔄 Probando endpoint ${index + 1}/${CONFIG.endpoints.softwareRequestsOptions.length}: ${fullUrl}`);
+      
+      // Crear encabezados para la prueba
+      const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      };
+      
+      // Modificar los datos de prueba, no necesitamos incluir el teamId
+      const requestData = {
+        ...sampleData
+        // Ya no incluimos el teamId porque el backend lo determinará basado en la API key
+      };
+      
+      console.log(`📤 Enviando datos de prueba:`, requestData);
+      
+      // Enviar una solicitud de prueba
+      fetch(fullUrl, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(requestData),
+        mode: 'cors',
+        cache: 'no-cache'
+      })
+      .then(async response => {
+        const contentType = response.headers.get('content-type') || '';
+        const text = await response.text();
+        
+        console.log(`📩 Respuesta de ${fullUrl} - Status:`, response.status);
+        console.log(`📩 Tipo de contenido:`, contentType);
+        console.log(`📩 Respuesta de prueba:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+        
+        // Verificar si recibimos HTML
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html') || 
+            contentType.includes('text/html')) {
+          console.warn(`⚠️ Endpoint ${fullUrl} devolvió HTML en lugar de JSON`);
+          throw new Error('Respuesta HTML recibida');
+        }
+        
+        // Incluso si recibimos un error, si es JSON, el endpoint existe pero puede necesitar datos correctos
+        try {
+          // Intentar analizar como JSON
+          JSON.parse(text);
+          
+          // Si llegamos aquí, el endpoint existe y devuelve JSON (incluso si es un error)
+          console.log(`✅ Encontrado endpoint válido: ${currentEndpoint}`);
+          CONFIG.endpoints.softwareRequests = currentEndpoint;
+          
+          // Guardar para futuras referencias
+          chrome.storage.local.set({ workingSoftwareRequestsEndpoint: currentEndpoint });
+          
+          callback(true);
+          return;
+        } catch (e) {
+          // No es JSON, intentar siguiente endpoint
+          console.warn(`⚠️ Endpoint ${fullUrl} no devolvió JSON válido:`, e.message);
+          throw new Error('Respuesta no es JSON válido');
+        }
+      })
+      .catch(error => {
+        console.warn(`❌ Error con endpoint ${fullUrl}:`, error.message);
+        // Probar con el siguiente endpoint
+        tryEndpoint(index + 1);
+      });
+    }
+    
+    // Comenzar con el primer endpoint
+    tryEndpoint(0);
+  });
+}
+
+// Verificar si la API key es válida
+function isValidApiKey(apiKey) {
+  // Lista de API keys de prueba conocidas
+  const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
+  
+  // Si es una API key de prueba, verificar que esté en la lista
+  if (testApiKeys.includes(apiKey)) {
+    return true;
+  }
+  
+  // Para API keys reales, verificar el formato
+  // Una API key real típicamente:
+  // - Tiene una longitud mínima (por ejemplo, 16 caracteres)
+  // - Puede contener letras, números y algunos caracteres especiales
+  // - No contiene espacios ni caracteres especiales no válidos
+  
+  // Verificar longitud mínima
+  if (apiKey.length < 8) {
+    return false;
+  }
+  
+  // Verificar caracteres válidos (letras, números, guiones, puntos, guiones bajos)
+  const validKeyPattern = /^[a-zA-Z0-9\-._]+$/;
+  if (!validKeyPattern.test(apiKey)) {
+    return false;
+  }
+  
+  // Si pasa todas las verificaciones, considerarla válida
+  // La verificación real se hará contra el servidor
+  return true;
+}
+
+// Función para mostrar u ocultar el indicador de API key válida
+function updateApiKeyValidityIndicator(isValid) {
+  let indicator = document.getElementById('apiKeyValidIndicator');
+  
+  // Si no existe el indicador, crearlo
+  if (!indicator) {
+    const apiKeyInput = document.getElementById('apiKey');
+    indicator = document.createElement('span');
+    indicator.id = 'apiKeyValidIndicator';
+    indicator.style.marginLeft = '10px';
+    indicator.style.fontWeight = 'bold';
+    
+    if (apiKeyInput && apiKeyInput.parentNode) {
+      apiKeyInput.parentNode.insertBefore(indicator, apiKeyInput.nextSibling);
+    }
+  }
+  
+  // Actualizar el indicador
+  if (isValid) {
+    indicator.textContent = '✅ API key válida';
+    indicator.style.color = 'green';
+  } else {
+    indicator.textContent = '❌ API key no válida';
+    indicator.style.color = 'red';
+  }
+}
+
+// Añadir un listener para validar la API key mientras se escribe
+document.addEventListener('DOMContentLoaded', function() {
+  const apiKeyInput = document.getElementById('apiKey');
+  if (apiKeyInput) {
+    apiKeyInput.addEventListener('input', function() {
+      const currentValue = apiKeyInput.value.trim();
+      updateApiKeyValidityIndicator(isValidApiKey(currentValue));
+    });
+  }
+});
+
+// Función para actualizar la visualización de la API key actual
+function updateApiKeyDisplay() {
+  chrome.storage.local.get(['apiKey'], function(result) {
+    const apiKey = result.apiKey;
+    
+    if (apiKey) {
+      let currentApiKeyDisplay = document.getElementById('currentApiKeyDisplay');
+      
+      if (currentApiKeyDisplay) {
+        // Mostrar parte de la API key por seguridad
+        const displayKey = apiKey.length > 8 
+          ? apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4) 
+          : apiKey;
+        currentApiKeyDisplay.textContent = `API Key: ${displayKey}`;
+      }
+    }
+  });
+}
+
+// Función para mostrar un diálogo de cambio de API key
+function showApiKeyChangeDialog() {
+  // Ocultar sección de descargas temporalmente
+  const downloadsSection = document.getElementById('downloads-section');
+  downloadsSection.style.display = 'none';
+  
+  // Crear el diálogo si no existe
+  let dialog = document.getElementById('apiKeyChangeDialog');
+  
+  if (!dialog) {
+    dialog = document.createElement('div');
+    dialog.id = 'apiKeyChangeDialog';
+    dialog.className = 'dialog';
+    dialog.innerHTML = `
+      <div class="dialog-content">
+        <h2>Cambiar API Key</h2>
+        <p>Introduce una nueva API key para la extensión:</p>
+        <div class="form-group">
+          <label for="newApiKey">API Key:</label>
+          <input type="text" id="newApiKey" class="input" placeholder="Ingresa tu API key">
+          <div id="newApiKeyHelp" style="font-size: 12px; color: #666; margin-top: 4px;">
+            API keys de prueba: test-api-key, dev-key, extension-key<br>
+            O ingresa una API key real proporcionada por tu administrador.
+          </div>
+          <div id="newApiKeyValidIndicator" style="margin-top: 8px;"></div>
+        </div>
+        <div class="button-group">
+          <button id="saveNewApiKeyBtn" class="button primary">Guardar</button>
+          <button id="cancelApiKeyChangeBtn" class="button secondary">Cancelar</button>
+        </div>
+      </div>
+    `;
+    
+    // Añadir al body
+    document.body.appendChild(dialog);
+    
+    // Configurar eventos
+    const newApiKeyInput = document.getElementById('newApiKey');
+    const saveNewApiKeyBtn = document.getElementById('saveNewApiKeyBtn');
+    const cancelApiKeyChangeBtn = document.getElementById('cancelApiKeyChangeBtn');
+    
+    // Validar API key mientras se escribe
+    newApiKeyInput.addEventListener('input', function() {
+      const currentValue = newApiKeyInput.value.trim();
+      
+      // Actualizar indicador de validez
+      const indicator = document.getElementById('newApiKeyValidIndicator');
+      if (isValidApiKey(currentValue)) {
+        // Determinar si es de prueba o real
+        const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
+        const isTestKey = testApiKeys.includes(currentValue);
+        
+        indicator.textContent = isTestKey 
+          ? '✅ API key de prueba válida' 
+          : '✅ Formato de API key válido';
+        indicator.style.color = 'green';
+        saveNewApiKeyBtn.disabled = false;
+      } else {
+        indicator.textContent = '❌ Formato de API key no válido';
+        indicator.style.color = 'red';
+        saveNewApiKeyBtn.disabled = true;
+      }
+    });
+    
+    // Guardar nueva API key
+    saveNewApiKeyBtn.addEventListener('click', function() {
+      const newApiKey = newApiKeyInput.value.trim();
+      
+      if (isValidApiKey(newApiKey)) {
+        chrome.storage.local.set({ apiKey: newApiKey }, function() {
+          showStatus('API key actualizada correctamente', 'success');
+          dialog.style.display = 'none';
+          downloadsSection.style.display = 'block';
+          
+          // Actualizar la visualización de la API key
+          updateApiKeyDisplay();
+          
+          // Verificar conexión con la nueva API key
+          checkServerConnection();
+        });
+      } else {
+        showStatus('Formato de API key no válido', 'error');
+      }
+    });
+    
+    // Cancelar cambio
+    cancelApiKeyChangeBtn.addEventListener('click', function() {
+      dialog.style.display = 'none';
+      downloadsSection.style.display = 'block';
+    });
+  } else {
+    // Reset del campo si el diálogo ya existe
+    document.getElementById('newApiKey').value = '';
+    document.getElementById('newApiKeyValidIndicator').textContent = '';
+  }
+  
+  // Mostrar el diálogo
+  dialog.style.display = 'block';
+}
+
+// Función para añadir los estilos CSS necesarios
+function addCustomStyles() {
+  // Comprobar si ya existen los estilos
+  if (document.getElementById('customStyles')) {
+    return;
+  }
+  
+  // Crear elemento style
+  const style = document.createElement('style');
+  style.id = 'customStyles';
+  style.textContent = `
+    /* Estilos para el diálogo */
+    .dialog {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+    
+    .dialog-content {
+      background-color: #fff;
+      margin: 20px auto;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      max-width: 400px;
+    }
+    
+    /* Estilos para la barra de acciones */
+    .actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    /* Estilos para el botón de API key */
+    #changeApiKeyBtn {
+      padding: 6px 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+    }
+    
+    /* Estilos para la visualización de la API key actual */
+    .api-key-display {
+      font-size: 12px;
+      color: #666;
+      margin-left: 10px;
+      background-color: #ebebeb;
+      padding: 4px 8px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    
+    /* Estilos para botones en el diálogo */
+    .button-group {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    
+    .button-group .button {
+      margin-left: 10px;
+    }
+    
+    /* Estilos para inputs en diálogo */
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    .form-group .input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+  `;
+  
+  // Añadir al head
+  document.head.appendChild(style);
+}
+
+// Función para verificar si una API key es válida con el servidor
+function verifyApiKey(apiKey, callback) {
+  console.log("🔍 Verificando API key:", apiKey ? apiKey.substring(0, 3) + "..." : "no proporcionada");
+  
+  // Verificar si la API key existe
+  if (!apiKey) {
+    console.error("❌ API key no proporcionada");
+    callback(false, "No se ha proporcionado una API key");
+    return;
+  }
+  
+  // Verificar localmente primero el formato básico
+  if (!isValidApiKey(apiKey)) {
+    console.error("❌ API key con formato no válido:", apiKey);
+    callback(false, "El formato de la API key no es válido. Debe tener al menos 8 caracteres y contener solo letras, números, guiones, puntos o guiones bajos.");
+    return;
+  }
+  
+  // Lista de API keys de prueba conocidas
+  const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
+  const isTestKey = testApiKeys.includes(apiKey);
+  
+  if (isTestKey) {
+    console.log("ℹ️ Utilizando una API key de prueba");
+  } else {
+    console.log("ℹ️ Utilizando una API key real");
+  }
+  
+  // Obtener la URL activa
+  chrome.storage.local.get(['activeApiUrl'], function(result) {
+    const baseUrl = result.activeApiUrl || CONFIG.apiUrl;
+    
+    // Intentar verificar con el servidor usando el endpoint /verify-key
+    const verifyUrl = `${baseUrl}/verify-key`;
+    
+    console.log("🔄 Verificando API key con el servidor:", verifyUrl);
+    
+    fetch(verifyUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'X-API-Key': apiKey,
+        'Cache-Control': 'no-cache'
+      },
+      mode: 'cors',
+      cache: 'no-cache'
+    })
+    .then(async response => {
+      console.log("📩 Respuesta de verificación - Status:", response.status);
+      
+      // Si responde con 200, la API key es válida
+      if (response.status === 200) {
+        try {
+          const data = await response.json();
+          const teamId = data.teamId || 'desconocido';
+          console.log("✅ API key verificada correctamente con el servidor. Equipo:", teamId);
+          callback(true, `API key válida (Equipo: ${teamId})`);
+        } catch (e) {
+          console.log("✅ API key verificada correctamente con el servidor");
+          callback(true, "API key válida");
+        }
+        return;
+      }
+      
+      // Si responde con 401, la API key es inválida
+      if (response.status === 401) {
+        const text = await response.text();
+        console.error("❌ API key rechazada por el servidor:", text);
+        callback(false, "API key rechazada por el servidor. " + text);
+        return;
+      }
+      
+      // Si el servidor no tiene el endpoint de verificación, intentar con un endpoint genérico
+      if (response.status === 404) {
+        console.warn("⚠️ Endpoint de verificación no encontrado, intentando con health check");
+        
+        // Intentar con el endpoint de health como alternativa
+        const healthUrl = `${baseUrl}${CONFIG.endpoints.health}`;
+        
+        fetch(healthUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-API-Key': apiKey,
+            'Cache-Control': 'no-cache'
+          }
+        })
+        .then(healthResponse => {
+          if (healthResponse.ok) {
+            console.log("✅ API key verificada mediante health check");
+            callback(true, "API key verificada mediante endpoint alternativo");
+          } else if (healthResponse.status === 401) {
+            console.error("❌ API key rechazada en health check");
+            callback(false, "API key rechazada por el servidor");
+          } else {
+            // Si el servidor está funcionando pero no verifica la API key, asumimos que es válida
+            console.warn("⚠️ No se pudo verificar la API key pero el servidor responde");
+            callback(true, "Servidor responde pero no verifica la API key");
+          }
+        })
+        .catch(() => {
+          // Si hay error de conexión, confiar en la validación local
+          console.warn("⚠️ No se pudo conectar para health check, confiando en validación local");
+          callback(true, "Validación local: La API key tiene un formato válido");
+        });
+        return;
+      }
+      
+      // Otros errores - fallback a validación local
+      console.warn("⚠️ No se pudo verificar la API key con el servidor, usando validación local");
+      callback(true, "Validación local: " + (isTestKey ? "API key de prueba válida" : "API key con formato válido"));
+    })
+    .catch(error => {
+      console.error("❌ Error al verificar API key con el servidor:", error.message);
+      // Si hay error de conexión, confiar en la validación local
+      callback(true, "Error de conexión. Validación local: " + (isTestKey ? "API key de prueba válida" : "API key con formato válido"));
     });
   });
 } 
