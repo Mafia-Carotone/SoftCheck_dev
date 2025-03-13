@@ -160,6 +160,7 @@ const Dashboard = () => {
         </div>
       </div>
 
+
       {/* News Related to Software */}
       <div className="card bg-base-100 shadow-xl transform transition-all duration-200 border-gray-200 dark:border-gray-700 rounded-2xl">
         <div className="card-body">
