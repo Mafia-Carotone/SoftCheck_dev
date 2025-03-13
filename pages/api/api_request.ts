@@ -40,13 +40,8 @@ const validateApiKey = async (apiKey: string | string[] | undefined): Promise<bo
   }
   
   try {
-    // Usamos temporalmente también las keys de prueba para compatibilidad
-    const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
-    if (testApiKeys.includes(apiKey)) {
-      console.log('🔑 Usando API key de prueba:', apiKey);
-      console.log('✅ API key de prueba válida (no requiere validación en base de datos)');
-      return true;
-    }
+    // Eliminamos la validación de keys de prueba
+    // y solo confiamos en la validación contra la base de datos
     
     // Hashear la API key recibida
     const hashedKey = hashApiKey(apiKey);
@@ -102,17 +97,6 @@ const validateApiKey = async (apiKey: string | string[] | undefined): Promise<bo
 // Función para obtener un ID de equipo basado en la API key
 // Ahora consulta la base de datos para obtener el equipo correcto
 const getTeamIdFromApiKey = async (apiKey: string): Promise<string> => {
-  // Para keys de prueba, seguimos usando el mapping hardcoded
-  const keyTeamMap: Record<string, string> = {
-    'test-api-key': 'test-team',
-    'dev-key': 'dev-team',
-    'extension-key': 'default-team'
-  };
-  
-  if (keyTeamMap[apiKey]) {
-    return keyTeamMap[apiKey];
-  }
-  
   try {
     // Hashear la API key
     const hashedKey = hashApiKey(apiKey);

@@ -38,27 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Permitir keys de prueba para desarrollo y testing
-    const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
-    if (testApiKeys.includes(apiKey)) {
-      console.log('🔑 Usando API key de prueba:', apiKey);
-      console.log('✅ API key de prueba válida (no requiere validación en base de datos)');
-      
-      // Para keys de prueba, devolvemos información ficticia
-      const teamMap: Record<string, string> = {
-        'test-api-key': 'test-team',
-        'dev-key': 'dev-team',
-        'extension-key': 'default-team'
-      };
-
-      return res.status(200).json({
-        valid: true,
-        teamId: teamMap[apiKey] || 'default-team',
-        message: 'API key de prueba válida',
-        isProdKey: false
-      });
-    }
-
+    // Eliminamos la validación de keys de prueba
+    
     // Hashear la API key recibida
     const hashedKey = hashApiKey(apiKey);
     
@@ -103,7 +84,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         valid: true,
         teamId: apiKeyRecord.teamId,
         message: 'API key válida',
-        isProdKey: true,
         keyInfo: {
           id: apiKeyRecord.id,
           name: apiKeyRecord.name,

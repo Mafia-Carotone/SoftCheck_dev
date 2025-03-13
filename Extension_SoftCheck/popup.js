@@ -167,36 +167,18 @@ function updateUI() {
 
 // Cargar la configuración guardada
 function loadSavedConfig() {
-  chrome.storage.local.get(['apiKey', 'activeApiUrl'], function(result) {
-    if (result.apiKey) {
-      document.getElementById('apiKey').value = result.apiKey;
-    } else {
-      // Si no hay API key guardada, proponer una por defecto y guardarla directamente
-      const defaultApiKey = 'test-api-key';
-      document.getElementById('apiKey').value = defaultApiKey;
-      
-      // Guardar la API key por defecto para que esté disponible inmediatamente
-      chrome.storage.local.set({ apiKey: defaultApiKey }, function() {
-        console.log('🔑 API key por defecto guardada:', defaultApiKey);
-      });
-    }
+  chrome.storage.local.get(['apiKey', 'activeApiUrl', 'workingSoftwareRequestsEndpoint', 'selectedTeam'], function(result) {
+    console.log('Configuración cargada:', result);
     
-    // Añadir un mensaje de ayuda sobre las API keys válidas
-    const apiKeyHelp = document.getElementById('apiKeyHelp');
-    if (apiKeyHelp) {
-      apiKeyHelp.innerHTML = 'API keys de prueba: test-api-key, dev-key, extension-key<br>O ingresa una API key real proporcionada por tu administrador.';
+    // Cargar API key si está guardada
+    if (result.apiKey) {
+      document.getElementById('api-key').value = result.apiKey;
+      updateApiKeyDisplay(); // Actualizar la visualización de la API key
+      verifyApiKey(result.apiKey, updateApiKeyValidityIndicator); // Verificar la validez
     } else {
-      // Si no existe, crear el elemento de ayuda
-      const apiKeyInput = document.getElementById('apiKey');
-      if (apiKeyInput && apiKeyInput.parentNode) {
-        const helpText = document.createElement('div');
-        helpText.id = 'apiKeyHelp';
-        helpText.innerHTML = 'API keys de prueba: test-api-key, dev-key, extension-key<br>O ingresa una API key real proporcionada por tu administrador.';
-        helpText.style.fontSize = '12px';
-        helpText.style.color = '#666';
-        helpText.style.marginTop = '4px';
-        apiKeyInput.parentNode.insertBefore(helpText, apiKeyInput.nextSibling);
-      }
+      // No establecemos una API key por defecto
+      document.getElementById('api-key').placeholder = 'Introduce tu API key';
+      updateApiKeyValidityIndicator(false);
     }
     
     // Si hay una URL activa guardada, actualizar CONFIG.apiUrl
@@ -1055,34 +1037,8 @@ function findWorkingSoftwareRequestsEndpoint(baseUrl, apiKey, testData, callback
 
 // Verificar si la API key es válida
 function isValidApiKey(apiKey) {
-  // Lista de API keys de prueba conocidas
-  const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
-  
-  // Si es una API key de prueba, verificar que esté en la lista
-  if (testApiKeys.includes(apiKey)) {
-    return true;
-  }
-  
-  // Para API keys reales, verificar el formato
-  // Una API key real típicamente:
-  // - Tiene una longitud mínima (por ejemplo, 16 caracteres)
-  // - Puede contener letras, números y algunos caracteres especiales
-  // - No contiene espacios ni caracteres especiales no válidos
-  
-  // Verificar longitud mínima
-  if (apiKey.length < 8) {
-    return false;
-  }
-  
-  // Verificar caracteres válidos (letras, números, guiones, puntos, guiones bajos)
-  const validKeyPattern = /^[a-zA-Z0-9\-._]+$/;
-  if (!validKeyPattern.test(apiKey)) {
-    return false;
-  }
-  
-  // Si pasa todas las verificaciones, considerarla válida
-  // La verificación real se hará contra el servidor
-  return true;
+  // Una API key válida debe tener al menos 8 caracteres
+  return apiKey && apiKey.length >= 8;
 }
 
 // Función para mostrar u ocultar el indicador de API key válida
@@ -1342,120 +1298,54 @@ function addCustomStyles() {
 
 // Función para verificar si una API key es válida con el servidor
 function verifyApiKey(apiKey, callback) {
-  console.log("🔍 Verificando API key:", apiKey ? apiKey.substring(0, 3) + "..." : "no proporcionada");
+  console.log('📋 Verificando API key...');
   
-  // Verificar si la API key existe
   if (!apiKey) {
-    console.error("❌ API key no proporcionada");
-    callback(false, "No se ha proporcionado una API key");
+    console.log('❌ No se proporcionó API key para verificar');
+    callback(false, 'No se ha proporcionado una API key');
     return;
   }
   
-  // Verificar localmente primero el formato básico
-  if (!isValidApiKey(apiKey)) {
-    console.error("❌ API key con formato no válido:", apiKey);
-    callback(false, "El formato de la API key no es válido. Debe tener al menos 8 caracteres y contener solo letras, números, guiones, puntos o guiones bajos.");
-    return;
-  }
+  console.log(`🔑 Verificando API key: ${apiKey.substring(0, 5)}...`);
   
-  // Lista de API keys de prueba conocidas
-  const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
-  const isTestKey = testApiKeys.includes(apiKey);
-  
-  if (isTestKey) {
-    console.log("ℹ️ Utilizando una API key de prueba");
-  } else {
-    console.log("ℹ️ Utilizando una API key real");
-  }
-  
-  // Obtener la URL activa
+  // Obtener la URL base activa
   chrome.storage.local.get(['activeApiUrl'], function(result) {
     const baseUrl = result.activeApiUrl || CONFIG.apiUrl;
     
-    // Intentar verificar con el servidor usando el endpoint /verify-key
-    const verifyUrl = `${baseUrl}/verify-key`;
-    
-    console.log("🔄 Verificando API key con el servidor:", verifyUrl);
-    
-    fetch(verifyUrl, {
+    // Intentar verificar con el servidor primero (endpoint /verify-key)
+    fetch(`${baseUrl}/verify-key`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
         'X-API-Key': apiKey,
-        'Cache-Control': 'no-cache'
-      },
-      mode: 'cors',
-      cache: 'no-cache'
+        'Content-Type': 'application/json'
+      }
     })
-    .then(async response => {
-      console.log("📩 Respuesta de verificación - Status:", response.status);
+    .then(response => {
+      console.log(`Respuesta de verificación: ${response.status}`);
       
-      // Si responde con 200, la API key es válida
       if (response.status === 200) {
-        try {
-          const data = await response.json();
-          const teamId = data.teamId || 'desconocido';
-          console.log("✅ API key verificada correctamente con el servidor. Equipo:", teamId);
-          callback(true, `API key válida (Equipo: ${teamId})`);
-        } catch (e) {
-          console.log("✅ API key verificada correctamente con el servidor");
-          callback(true, "API key válida");
-        }
-        return;
-      }
-      
-      // Si responde con 401, la API key es inválida
-      if (response.status === 401) {
-        const text = await response.text();
-        console.error("❌ API key rechazada por el servidor:", text);
-        callback(false, "API key rechazada por el servidor. " + text);
-        return;
-      }
-      
-      // Si el servidor no tiene el endpoint de verificación, intentar con un endpoint genérico
-      if (response.status === 404) {
-        console.warn("⚠️ Endpoint de verificación no encontrado, intentando con health check");
-        
-        // Intentar con el endpoint de health como alternativa
-        const healthUrl = `${baseUrl}${CONFIG.endpoints.health}`;
-        
-        fetch(healthUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'X-API-Key': apiKey,
-            'Cache-Control': 'no-cache'
+        // La API key es válida según el servidor
+        response.json().then(data => {
+          console.log('✅ API key validada por el servidor:', data);
+          // Guardar el teamId si está disponible
+          if (data.teamId) {
+            chrome.storage.local.set({ teamId: data.teamId });
           }
-        })
-        .then(healthResponse => {
-          if (healthResponse.ok) {
-            console.log("✅ API key verificada mediante health check");
-            callback(true, "API key verificada mediante endpoint alternativo");
-          } else if (healthResponse.status === 401) {
-            console.error("❌ API key rechazada en health check");
-            callback(false, "API key rechazada por el servidor");
-          } else {
-            // Si el servidor está funcionando pero no verifica la API key, asumimos que es válida
-            console.warn("⚠️ No se pudo verificar la API key pero el servidor responde");
-            callback(true, "Servidor responde pero no verifica la API key");
-          }
-        })
-        .catch(() => {
-          // Si hay error de conexión, confiar en la validación local
-          console.warn("⚠️ No se pudo conectar para health check, confiando en validación local");
-          callback(true, "Validación local: La API key tiene un formato válido");
+          callback(true, `API key válida para equipo: ${data.teamId || 'desconocido'}`);
         });
-        return;
+      } else if (response.status === 401) {
+        // La API key es inválida según el servidor
+        console.log('❌ API key inválida según el servidor');
+        callback(false, 'API key inválida');
+      } else {
+        // Error al conectar con el servidor, intentamos verificación local
+        console.warn('⚠️ No se pudo verificar con el servidor, error:', response.status);
+        callback(false, 'No se pudo verificar la API key con el servidor');
       }
-      
-      // Otros errores - fallback a validación local
-      console.warn("⚠️ No se pudo verificar la API key con el servidor, usando validación local");
-      callback(true, "Validación local: " + (isTestKey ? "API key de prueba válida" : "API key con formato válido"));
     })
     .catch(error => {
-      console.error("❌ Error al verificar API key con el servidor:", error.message);
-      // Si hay error de conexión, confiar en la validación local
-      callback(true, "Error de conexión. Validación local: " + (isTestKey ? "API key de prueba válida" : "API key con formato válido"));
+      console.error('Error al verificar la API key:', error);
+      callback(false, 'Error de conexión al verificar la API key');
     });
   });
 } 
