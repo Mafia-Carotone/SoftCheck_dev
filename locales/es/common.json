@@ -272,5 +272,16 @@
   "excel-invalid-format": "Formato de Excel inválido. El Excel debe contener columnas con 'process' y 'name' para el nombre del software y 'process' y 'user' para la información del usuario.",
   "excel-no-columns": "El archivo Excel no tiene columnas o no se pudo detectar su estructura de datos.",
   "excel-processed": "Archivo Excel procesado correctamente. La descarga comenzará automáticamente",
-  "excel-processing-error": "Error al procesar el archivo Excel"
+  "excel-processing-error": "Error al procesar el archivo Excel",
+  "dashboard": "Panel de Control",
+  "total-software": "Software Total",
+  "approved-software": "Software Aprobado",
+  "denied-software": "Software Denegado",
+  "software-distribution": "Distribución de Software",
+  "latest-software": "Software Reciente",
+  "software-news": "Noticias de Software",
+  "date": "Fecha",
+  "source": "Fuente",
+  "title": "Título",
+  "denied": "Denegado"
 }

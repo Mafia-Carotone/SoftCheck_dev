@@ -1,4 +1,4 @@
-import { Cog6ToothIcon, CodeBracketIcon, DocumentCheckIcon, CircleStackIcon } from '@heroicons/react/24/outline';
+import { Cog6ToothIcon, CodeBracketIcon, DocumentCheckIcon, CircleStackIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'next-i18next';
 import NavigationItems from './NavigationItems';
 import { NavigationProps, MenuItem } from './NavigationItems';
@@ -11,6 +11,12 @@ const TeamNavigation = ({ slug, activePathname }: NavigationItemsProps) => {
   const { t } = useTranslation('common');
 
   const menus: MenuItem[] = [
+    {
+      name: t('dashboard'),
+      href: `/teams/${slug}/dashboard`,
+      icon: ChartBarIcon,
+      active: activePathname === `/teams/${slug}/dashboard.tsx`,
+    },
     {
       name: t('add-software'),
       href: `/teams/${slug}/add_software`,
