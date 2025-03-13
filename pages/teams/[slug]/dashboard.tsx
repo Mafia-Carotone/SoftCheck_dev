@@ -75,21 +75,31 @@ const Dashboard = () => {
           <div className="flex justify-center py-4">
             {/* Gráfico de pastel simplificado */}
             <div className="relative w-48 h-48">
-              {/* Fondo completo rojo (denegados) */}
-              <div className="absolute inset-0 rounded-full bg-red-500"></div>
-              
-              {/* Porción verde que se ajusta según el porcentaje de aprobados */}
-              <div 
-                className="absolute inset-0 rounded-full bg-green-500 origin-center"
-                style={{
-                  clipPath: approvedSoftware > 0 
-                    ? `polygon(50% 50%, 50% 0%, ${approvedSoftware === totalSoftware 
-                      ? '50% 100%, 50% 0%' 
-                      : `100% 0%, 100% 100%, 0% 100%, 0% 0%`})`
-                    : 'none',
-                  transform: `rotate(${(100 - approvedPercentage) * 3.6}deg)`,
-                }}
-              ></div>
+              {/* Casos específicos */}
+              {approvedSoftware === totalSoftware ? (
+                /* Si todos están aprobados, mostrar círculo completo verde */
+                <div className="absolute inset-0 rounded-full bg-green-500"></div>
+              ) : notApprovedSoftware === totalSoftware ? (
+                /* Si todos están denegados, mostrar círculo completo rojo */
+                <div className="absolute inset-0 rounded-full bg-red-500"></div>
+              ) : (
+                /* Si hay una mezcla, mostrar el gráfico de pastel con la proporción correcta */
+                <>
+                  {/* Fondo base rojo */}
+                  <div className="absolute inset-0 rounded-full bg-red-500"></div>
+                  
+                  {/* Porción verde para aprobados */}
+                  <div 
+                    className="absolute inset-0 rounded-full bg-green-500"
+                    style={{
+                      clipPath: `polygon(50% 50%, 50% 0%, ${approvedPercentage >= 50 
+                        ? '100% 0%, 100% ' + (approvedPercentage === 75 ? '100%' : approvedPercentage > 75 ? '100%' : '50%') + ', 50% 50%' 
+                        : (approvedPercentage === 25 ? '50% 0%' : approvedPercentage > 25 ? '100% 0%, 100% 0%' : '50% 0%') + ', 50% 50%'})`,
+                      transform: `rotate(${approvedPercentage * 3.6}deg)`
+                    }}
+                  ></div>
+                </>
+              )}
               
               {/* Círculo interior blanco para crear efecto donut */}
               <div className="absolute rounded-full bg-base-100" style={{
@@ -102,7 +112,9 @@ const Dashboard = () => {
               {/* Texto central con porcentaje */}
               <div className="absolute inset-0 flex items-center justify-center font-bold text-xl">
                 <div className="text-center">
-                  <span className="text-green-500">{approvedPercentage}%</span>
+                  <span className={approvedSoftware > 0 ? "text-green-500" : "text-red-500"}>
+                    {approvedPercentage}%
+                  </span>
                   <br />
                   <span className="text-xs text-gray-500">{t('approved')}</span>
                 </div>
