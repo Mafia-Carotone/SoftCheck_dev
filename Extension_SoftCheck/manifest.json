@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "SoftCheck Download Notifier",
+  "version": "1.0",
+  "description": "Monitorea las descargas de software y envía solicitudes de aprobación a SoftCheck",
+  "permissions": [
+    "downloads",
+    "storage",
+    "notifications",
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon-16.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  }
+} 

@@ -177,6 +177,16 @@ export const createSoftwareSchema = z.object({
   approved: z.boolean().default(false)
 });
 
+export const createSoftwareRequestSchema = z.object({
+  fileName: z.string().min(1, 'File name is required'),
+  fileSize: z.number().optional(),
+  fileUrl: z.string().url().optional(),
+  downloadSource: z.string().optional(),
+  teamId: z.string().min(1, 'Team ID is required'),
+  userId: z.string().min(1, 'User ID is required'),
+  status: z.string().default('pending'),
+});
+
 // email or slug
 export const ssoVerifySchema = z
   .object({

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoftCheck Extension</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <img src="logo-blue.png" alt="SoftCheck Logo" class="logo">
+    <h1>SoftCheck</h1>
+    <p>Monitorea tus descargas de software y envíalas para aprobación</p>
+    
+    <!-- Sección de configuración (oculta si ya hay API key) -->
+    <div id="config-section">
+        <p>Configura tu API Key para comenzar</p>
+        <input type="text" id="apiKey" placeholder="Ingresa tu API Key" class="form-input">
+        <button id="saveConfigBtn">Guardar Configuración</button>
+    </div>
+    
+    <!-- Sección de descargas (visible después de configurar) -->
+    <div id="downloads-section" style="display: none;">
+        <div class="section-header">
+            <h2>Software descargado</h2>
+            <div class="download-counter">
+                Pendientes: <span id="pendingCount">0</span>
+            </div>
+        </div>
+        
+        <!-- Lista de software descargado -->
+        <div id="downloads-list">
+            <!-- Aquí se mostrarán las descargas -->
+        </div>
+        
+        <!-- Botón para enviar todas las descargas pendientes -->
+        <button id="sendAllBtn" class="action-button">Enviar todas para aprobación</button>
+    </div>
+    
+    <div id="status" class="status"></div>
+    
+    <!-- Template para los elementos de descarga -->
+    <template id="download-item-template">
+        <div class="download-item">
+            <div class="download-info">
+                <div class="download-name"></div>
+                <div class="download-meta"></div>
+            </div>
+            <div class="download-actions">
+                <button class="send-button">Enviar</button>
+                <button class="cancel-button">Cancelar</button>
+            </div>
+        </div>
+    </template>
+    
+    <script src="popup.js"></script>
+</body>
+</html> 
