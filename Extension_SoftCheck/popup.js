@@ -349,17 +349,10 @@ function testApiUrls(currentIndex = 0) {
 // Intentar conectar directamente a la API
 function tryApiConnection() {
   chrome.storage.local.get(['apiKey', 'activeApiUrl'], function(result) {
-    // Si no hay API key, intentar configurar una por defecto
+    // Si no hay API key, mostrar mensaje y salir
     if (!result.apiKey) {
-      console.warn('⚠️ No hay API key disponible para el health check. Configurando una por defecto.');
-      
-      // Configurar una API key por defecto
-      const defaultApiKey = 'test-api-key';
-      chrome.storage.local.set({ apiKey: defaultApiKey }, function() {
-        console.log('🔑 API key por defecto configurada:', defaultApiKey);
-        // Volver a intentar la conexión con la nueva API key
-        setTimeout(tryApiConnection, 100);
-      });
+      console.warn('⚠️ No hay API key disponible para el health check.');
+      connectionFailed('No hay API key configurada. Por favor, configura una API key para continuar.');
       return;
     }
     
