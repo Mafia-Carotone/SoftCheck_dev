@@ -5,46 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SoftCheck Extension</title>
     <link rel="stylesheet" href="popup.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
 </head>
 <body>
-    <img src="logo-blue.png" alt="SoftCheck Logo" class="logo">
-    <h1>SoftCheck</h1>
-    <p>Monitorea tus descargas de software y envíalas para aprobación</p>
-    
-    <!-- Sección de configuración (oculta si ya hay API key) -->
-    <div id="config-section">
-        <p>Configura tu API Key para comenzar</p>
-        <input type="text" id="apiKey" placeholder="Ingresa tu API Key" class="form-input">
-        <button id="saveConfigBtn">Guardar Configuración</button>
-    </div>
-    
-    <!-- Sección de descargas (visible después de configurar) -->
-    <div id="downloads-section" style="display: none;">
-        <div class="section-header">
-            <h2>Software descargado</h2>
-            <div class="download-counter">
-                Pendientes: <span id="pendingCount">0</span>
+    <div class="container">
+        <div class="header">
+            <img src="logo-blue.png" alt="SoftCheck Logo" class="logo">
+            <h1>SoftCheck</h1>
+        </div>
+        
+        <p class="description">Monitorea tus descargas de software y envíalas para aprobación</p>
+        
+        <!-- Sección de configuración (oculta si ya hay API key) -->
+        <div id="config-section" class="main-section">
+            <div class="header-with-icon">
+                <i class="fas fa-cog"></i>
+                <h2>Configuración</h2>
+            </div>
+            <p>Configura tu API Key para comenzar</p>
+            <div class="input-container">
+                <input type="text" id="apiKey" placeholder="Ingresa tu API Key" class="form-input">
+                <button id="saveConfigBtn" class="primary-button">
+                    <i class="fas fa-save"></i> Guardar Configuración
+                </button>
             </div>
         </div>
         
-        <!-- Lista de software descargado -->
-        <div id="downloads-list">
-            <!-- Aquí se mostrarán las descargas -->
+        <!-- Sección de descargas (visible después de configurar) -->
+        <div id="downloads-section" class="main-section" style="display: none;">
+            <div id="actions-container" class="actions-bar">
+                <button id="sendAllBtn" class="primary-button">
+                    <i class="fas fa-paper-plane"></i> Enviar Todas
+                </button>
+                <button id="changeApiKeyBtn" class="secondary-button">
+                    <i class="fas fa-key"></i> Cambiar API Key
+                </button>
+                <div id="currentApiKeyDisplay" class="api-key-display"></div>
+            </div>
+            
+            <div class="header-with-icon">
+                <i class="fas fa-download"></i>
+                <h2>Software Descargado <span id="pendingCount" class="badge">0</span></h2>
+            </div>
+            
+            <!-- Lista de software descargado -->
+            <div id="downloads-list" class="downloads-list">
+                <!-- Aquí se mostrarán las descargas -->
+            </div>
         </div>
+        
+        <div id="status" class="status-message"></div>
     </div>
-    
-    <div id="status" class="status"></div>
     
     <!-- Template para los elementos de descarga -->
     <template id="download-item-template">
         <div class="download-item">
-            <div class="download-info">
-                <div class="download-name"></div>
-                <div class="download-meta"></div>
+            <div class="download-item-header">
+                <i class="fas fa-file-alt download-icon"></i>
+                <div class="download-info">
+                    <div class="download-name"></div>
+                    <div class="download-meta"></div>
+                </div>
             </div>
             <div class="download-actions">
-                <button class="send-button">Enviar</button>
-                <button class="cancel-button">Cancelar</button>
+                <button class="send-button action-button">
+                    <i class="fas fa-paper-plane"></i> Enviar
+                </button>
+                <button class="cancel-button action-button secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
             </div>
         </div>
     </template>

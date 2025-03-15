@@ -33,7 +33,7 @@ let pendingDownloads = [];
 
 // Listen for downloads
 chrome.downloads.onCreated.addListener((downloadItem) => {
-  console.log('New download detected:', downloadItem);
+  console.log('🔍 Nueva descarga detectada:', downloadItem);
   
   // Extraer información relevante del archivo
   const downloadInfo = {
@@ -47,14 +47,18 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
     timestamp: new Date().toISOString()
   };
   
+  console.log('📦 Información de descarga extraída:', downloadInfo);
+  
   // Almacenar la descarga pendiente
   chrome.storage.local.get(['pendingDownloads'], function(result) {
+    console.log('📂 Descargas pendientes actuales:', result.pendingDownloads);
+    
     const downloads = result.pendingDownloads || [];
     downloads.push(downloadInfo);
     
     // Guardar en almacenamiento local
     chrome.storage.local.set({ pendingDownloads: downloads }, function() {
-      console.log('Download saved to storage:', downloadInfo);
+      console.log('💾 Descarga guardada en almacenamiento local. Total descargas:', downloads.length);
       
       // Mostrar notificación
       chrome.notifications.create({
@@ -460,4 +464,26 @@ function init() {
 }
 
 // Iniciar la extensión
-init(); 
+init();
+
+// Función para determinar si un archivo es software (implementada explícitamente)
+function isSoftwareFile(downloadItem) {
+  console.log('📋 Evaluando si el archivo es software:', downloadItem.filename);
+  
+  // Lista de extensiones de archivos considerados software
+  const softwareExtensions = [
+    '.exe', '.msi', '.dmg', '.pkg', '.deb', '.rpm', 
+    '.app', '.apk', '.jar', '.zip', '.rar', '.7z', 
+    '.tar.gz', '.iso', '.dll', '.appimage'
+  ];
+  
+  // Obtener la extensión del archivo
+  const filename = downloadItem.filename.toLowerCase();
+  const hasExtension = softwareExtensions.some(ext => filename.endsWith(ext));
+  
+  console.log(`📋 El archivo ${filename} ${hasExtension ? 'ES' : 'NO es'} considerado software`);
+  
+  // Considerar todos los archivos como software para fines de depuración
+  // Esto asegura que todas las descargas sean interceptadas durante las pruebas
+  return true; // Interceptar todas las descargas para depuración
+} 

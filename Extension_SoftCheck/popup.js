@@ -63,7 +63,28 @@ const CONFIG = {
   }
 };
 
+// Cuando el documento esté cargado completamente
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('🚀 DOMContentLoaded - Inicializando extensión SoftCheck');
+  
+  // Depurar la estructura del DOM
+  console.log('🔍 Verificando elementos del DOM:');
+  console.log('- apiKey input:', !!document.getElementById('apiKey'));
+  console.log('- config-section:', !!document.getElementById('config-section'));
+  console.log('- downloads-section:', !!document.getElementById('downloads-section'));
+  console.log('- downloads-list:', !!document.getElementById('downloads-list'));
+  console.log('- pendingCount:', !!document.getElementById('pendingCount'));
+  console.log('- status:', !!document.getElementById('status'));
+  console.log('- download-item-template:', !!document.getElementById('download-item-template'));
+  console.log('- saveConfigBtn:', !!document.getElementById('saveConfigBtn'));
+  console.log('- sendAllBtn:', !!document.getElementById('sendAllBtn'));
+  
+  // Verificar descargas pendientes directamente
+  chrome.storage.local.get(['pendingDownloads'], function(result) {
+    console.log('📦 Descargas pendientes en storage:', result.pendingDownloads);
+    console.log('📦 Cantidad de descargas:', result.pendingDownloads ? result.pendingDownloads.length : 0);
+  });
+  
   // Añadir estilos CSS personalizados
   addCustomStyles();
   
@@ -81,41 +102,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // Verificar el estado del servidor con la API key ya cargada
     checkServerConnection();
     
+    console.log('🔄 Configurando event listeners...');
+    
     // Obtener elementos del DOM
-    const configSection = document.getElementById('config-section');
-    const downloadsSection = document.getElementById('downloads-section');
-    const apiKeyInput = document.getElementById('apiKey');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const sendAllBtn = document.getElementById('sendAllBtn');
-    const statusDiv = document.getElementById('status');
     
     // Event listeners
-    saveConfigBtn.addEventListener('click', saveConfiguration);
-    sendAllBtn.addEventListener('click', sendAllDownloads);
+    if (saveConfigBtn) {
+      console.log('✅ Configurando listener para saveConfigBtn');
+      saveConfigBtn.addEventListener('click', saveConfiguration);
+    } else {
+      console.error('❌ No se encontró el botón saveConfigBtn');
+    }
+    
+    if (sendAllBtn) {
+      console.log('✅ Configurando listener para sendAllBtn');
+      sendAllBtn.addEventListener('click', sendAllDownloads);
+    } else {
+      console.error('❌ No se encontró el botón sendAllBtn');
+    }
     
     // Cargar y mostrar las descargas
+    console.log('🔄 Cargando descargas pendientes...');
     loadPendingDownloads();
     
     // Actualizar las descargas cada 5 segundos
+    console.log('⏱️ Configurando intervalo para actualizar descargas');
     setInterval(loadPendingDownloads, 5000);
   }, 300); // Esperar 300ms para asegurar que la API key se haya guardado
 });
 
 // Actualizar la interfaz según si hay configuración o no
 function updateUI() {
+  console.log('🔄 Actualizando interfaz UI...');
+  
   chrome.storage.local.get(['apiKey'], function(result) {
     const configSection = document.getElementById('config-section');
     const downloadsSection = document.getElementById('downloads-section');
+    
+    if (!configSection || !downloadsSection) {
+      console.error('❌ ERROR: No se encontraron secciones principales del DOM');
+      return;
+    }
+    
+    console.log('🔑 API Key presente:', !!result.apiKey);
     
     if (result.apiKey) {
       // Hay configuración: mostrar sección de descargas
       configSection.style.display = 'none';
       downloadsSection.style.display = 'block';
       
+      console.log('🔄 Mostrando sección de descargas');
+      
       // Asegurarnos de que existe el botón de cambio de API key
       let apiKeyButton = document.getElementById('changeApiKeyBtn');
       
       if (!apiKeyButton) {
+        console.log('🔄 Creando botón de cambio de API Key');
         // Crear el contenedor de acciones si no existe
         let actionsContainer = document.getElementById('actions-container');
         if (!actionsContainer) {
@@ -161,6 +205,7 @@ function updateUI() {
       // No hay configuración: mostrar sección de configuración
       configSection.style.display = 'block';
       downloadsSection.style.display = 'none';
+      console.log('🔄 Mostrando sección de configuración (no hay API Key)');
     }
   });
 }
@@ -466,15 +511,30 @@ function connectionFailed(message) {
 
 // Cargar y mostrar las descargas pendientes
 function loadPendingDownloads() {
+  console.log('🔄 loadPendingDownloads() llamada');
+  
   chrome.storage.local.get(['pendingDownloads'], function(result) {
+    console.log('📦 Datos recuperados de storage:', result);
+    
     const pendingDownloads = result.pendingDownloads || [];
+    console.log('📦 Cantidad de descargas:', pendingDownloads.length);
+    
     const pendingCount = document.getElementById('pendingCount');
     const downloadsList = document.getElementById('downloads-list');
     
+    if (!downloadsList) {
+      console.error('❌ ERROR: No se encontró el elemento downloads-list en el DOM');
+      return;
+    }
+    
     // Actualizar contador - solo contar las que están en estado pendiente
     const truePendingCount = pendingDownloads.filter(d => d.status === 'pending').length;
+    console.log('📊 Descargas realmente pendientes:', truePendingCount);
+    
     if (pendingCount) {
       pendingCount.textContent = truePendingCount;
+    } else {
+      console.error('❌ ERROR: No se encontró el elemento pendingCount');
     }
     
     // Limpiar lista actual
@@ -482,20 +542,38 @@ function loadPendingDownloads() {
     
     // Si no hay descargas, mostrar mensaje
     if (pendingDownloads.length === 0) {
-      downloadsList.innerHTML = '<div class="no-downloads">No hay descargas pendientes</div>';
+      console.log('📭 No hay descargas pendientes, mostrando mensaje');
+      downloadsList.innerHTML = '<div class="no-downloads"><i class="fas fa-info-circle"></i> No hay descargas pendientes</div>';
       return;
     }
     
     // Obtener el template
     const template = document.getElementById('download-item-template');
+    if (!template) {
+      console.error('❌ ERROR: No se encontró el template download-item-template');
+      return;
+    }
+    
+    console.log('🔄 Agregando descargas a la lista...');
     
     // Añadir cada descarga a la lista
     pendingDownloads.forEach((download, index) => {
+      console.log(`📥 Procesando descarga ${index}:`, download);
+      
       // Clonar el template
       const downloadItem = document.importNode(template.content, true);
       
+      // Asegurarse de que los elementos existen
+      const nameElement = downloadItem.querySelector('.download-name');
+      const metaElement = downloadItem.querySelector('.download-meta');
+      
+      if (!nameElement || !metaElement) {
+        console.error('❌ ERROR: No se encontraron elementos esenciales en el template');
+        return;
+      }
+      
       // Rellenar datos
-      downloadItem.querySelector('.download-name').textContent = download.fileName;
+      nameElement.textContent = download.fileName;
       
       // Formato de tamaño y tipo de archivo
       const fileSize = formatFileSize(download.fileSize);
@@ -523,37 +601,47 @@ function loadPendingDownloads() {
         }
       }
       
-      downloadItem.querySelector('.download-meta').innerHTML = `
-        <div>${fileSize} • ${fileType}</div>
-        <div>Origen: ${source}</div>
-        <div>${formattedDate}</div>
-        <div class="${statusClass}">Estado: ${statusText}</div>
+      metaElement.innerHTML = `
+        <div><i class="fas fa-hdd"></i> ${fileSize} • <i class="fas fa-file"></i> ${fileType}</div>
+        <div><i class="fas fa-link"></i> Origen: ${source}</div>
+        <div><i class="fas fa-calendar"></i> ${formattedDate}</div>
+        <div class="${statusClass}"><i class="fas fa-${download.status === 'sent' ? 'paper-plane' : 'clock'}"></i> Estado: ${statusText}</div>
       `;
       
       // Configurar botón de envío - deshabilitarlo si ya fue enviado
       const sendButton = downloadItem.querySelector('.send-button');
-      if (download.status === 'sent') {
-        sendButton.textContent = 'Enviado';
-        sendButton.disabled = true;
-        sendButton.classList.add('disabled');
+      if (!sendButton) {
+        console.error('❌ ERROR: No se encontró el botón send-button en el template');
       } else {
-        sendButton.addEventListener('click', function() {
-          sendSoftwareRequest(index);
-        });
+        if (download.status === 'sent') {
+          sendButton.innerHTML = '<i class="fas fa-check"></i> Enviado';
+          sendButton.disabled = true;
+          sendButton.classList.add('disabled');
+        } else {
+          sendButton.addEventListener('click', function() {
+            sendSoftwareRequest(index);
+          });
+        }
       }
       
       // Configurar botón de cancelación - cambiar texto si fue enviado
       const cancelButton = downloadItem.querySelector('.cancel-button');
-      if (download.status === 'sent') {
-        cancelButton.textContent = 'Cancelar solicitud';
+      if (!cancelButton) {
+        console.error('❌ ERROR: No se encontró el botón cancel-button en el template');
+      } else {
+        if (download.status === 'sent') {
+          cancelButton.innerHTML = '<i class="fas fa-trash"></i> Cancelar solicitud';
+        }
+        cancelButton.addEventListener('click', function() {
+          cancelDownload(index);
+        });
       }
-      cancelButton.addEventListener('click', function() {
-        cancelDownload(index);
-      });
       
       // Añadir a la lista
       downloadsList.appendChild(downloadItem);
     });
+    
+    console.log('✅ Finalizada la adición de descargas a la lista');
   });
 }
 
