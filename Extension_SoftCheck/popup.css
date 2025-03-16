@@ -116,8 +116,8 @@ button:active {
 .header-with-icon {
   display: flex;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 12px;
+  margin-bottom: 5px;
+  padding-bottom: 5px;
   border-bottom: 1px solid #f0f0f0;
 }
 
