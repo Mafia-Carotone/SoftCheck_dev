@@ -1,5 +1,7 @@
 body {
-  width: 400px;
+  width: 600px;
+  max-width: 800px;
+  min-width: 400px;
   min-height: 300px;
   font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 0;
