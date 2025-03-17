@@ -27,6 +27,7 @@ const SoftwareTable = () => {
   const [selectedSoftware, setSelectedSoftware] = useState<Software | null>(null);
   const [addSoftwareModalVisible, setAddSoftwareModalVisible] = useState(false);
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
 
   const { isLoading, isError, softwareList, mutateSoftwareList } = useSoftwareList();
 
@@ -41,6 +42,10 @@ const SoftwareTable = () => {
   if (!softwareList) {
     return null;
   }
+
+  // Filtrar la lista para obtener software pendiente y aprobado
+  const pendingSoftware = softwareList.filter(software => !software.approved);
+  const approvedSoftware = softwareList.filter(software => software.approved);
 
   const removeSoftware = async (software: Software | null) => {
     if (!software) return;
@@ -101,6 +106,33 @@ const SoftwareTable = () => {
     } catch (error: any) {
       console.error('Error adding software:', error);
       toast.error(error.message || 'Error al añadir el software');
+    }
+  };
+
+  const approveSoftware = async (software: Software) => {
+    const teamSlug = router.query.slug as string;
+    try {
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: software.id,
+          approved: true
+        })
+      });
+
+      if (!response.ok) {
+        const json = await response.json();
+        throw Error(json.error?.message || 'Error al aprobar el software');
+      }
+
+      mutateSoftwareList();
+      toast.success(t('software-approved'));
+    } catch (error: any) {
+      console.error('Error approving software:', error);
+      toast.error(error.message || 'Error al aprobar el software');
     }
   };
 
@@ -224,12 +256,15 @@ const SoftwareTable = () => {
     t('windows-exe'),
     t('macos-exe'),
     t('version'),
-    t('approved'),
     t('approval-date'),
   ];
 
+  const pendingCols = [...cols];
+  const approvedCols = [...cols, t('approved')];
+
   if (canAccess('team_software', ['delete'])) {
-    cols.push(t('actions'));
+    pendingCols.push(t('actions'));
+    approvedCols.push(t('actions'));
   }
 
   // Validation schema for the form
@@ -242,69 +277,145 @@ const SoftwareTable = () => {
   });
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-medium leading-none tracking-tight">{t('Software Database')}</h2>
-        <div className="flex space-x-2">
-          {canAccess('team_software', ['create']) && (
-            <Button 
-              className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 py-2 px-4" 
-              onClick={() => setAddSoftwareModalVisible(true)}
-            >
-              {t('Add Software')}
-            </Button>
-          )}
-          <Button 
-            className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 py-2 px-4"
-            onClick={handleUploadClick}
-            disabled={isProcessingExcel}
-          >
-            {t('Upload Excel')}
-          </Button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".xlsx, .xls"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button 
-            className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 py-2 px-4" 
-            onClick={downloadExcel}
-          >
-            {t('Download Database')}
-          </Button>
-        </div>
-      </div>
-      <Table
-        cols={cols}
-        body={softwareList.map((software) => ({
-          id: software.id,
-          cells: [
-            { text: software.softwareName, wrap: true },
-            { text: software.windowsEXE || '-', wrap: true },
-            { text: software.macosEXE || '-', wrap: true },
-            { text: software.version, wrap: true },
-            { text: software.approved ? t('yes') : t('no'), wrap: true },
-            { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
-            ...(canAccess('team_software', ['delete'])
-              ? [{
-                  buttons: [
-                    {
-                      color: 'error',
-                      text: t('remove'),
-                      onClick: () => {
-                        setSelectedSoftware(software);
-                        setConfirmationDialogVisible(true);
-                      },
-                    },
-                  ],
-                }]
-              : []),
-          ],
-        }))}
-      />
+    <div className="space-y-8">
+      {/* Tabs para navegación entre Pending y Approved */}
+      <div className="flex border-b">
+      <button 
+          className={`py-2 px-4 font-medium ${activeTab === 'approved' 
+            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
+            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}
+          onClick={() => setActiveTab('approved')}
+        >
+          {t('Software Database')}
+        </button>
+        <button 
+          className={`py-2 px-4 font-medium ${activeTab === 'pending' 
+            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
+            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}
+          onClick={() => setActiveTab('pending')}
+        >
+          {t('Pending Software')}
+        </button>
 
+      </div>
+
+      {/* Sección de Software Database (original) */}
+      {activeTab === 'approved' && (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-medium leading-none tracking-tight">{t('Software Database')}</h2>
+            <div className="flex space-x-2">
+              {canAccess('team_software', ['create']) && (
+                <Button 
+                  className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 py-2 px-4" 
+                  onClick={() => setAddSoftwareModalVisible(true)}
+                >
+                  {t('Add Software')}
+                </Button>
+              )}
+              <Button 
+                className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 py-2 px-4"
+                onClick={handleUploadClick}
+                disabled={isProcessingExcel}
+              >
+                {t('Upload Excel')}
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".xlsx, .xls"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button 
+                className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 py-2 px-4" 
+                onClick={downloadExcel}
+              >
+                {t('Download Database')}
+              </Button>
+            </div>
+          </div>
+          
+          <Table
+            cols={approvedCols}
+            body={approvedSoftware.map((software) => ({
+              id: software.id,
+              cells: [
+                { text: software.softwareName, wrap: true },
+                { text: software.windowsEXE || '-', wrap: true },
+                { text: software.macosEXE || '-', wrap: true },
+                { text: software.version, wrap: true },
+                { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
+                { text: software.approved ? t('yes') : t('no'), wrap: true },
+                ...(canAccess('team_software', ['delete'])
+                  ? [{
+                      buttons: [
+                        {
+                          color: 'error',
+                          text: t('remove'),
+                          onClick: () => {
+                            setSelectedSoftware(software);
+                            setConfirmationDialogVisible(true);
+                          },
+                        },
+                      ],
+                    }]
+                  : []),
+              ],
+            }))}
+          />
+        </div>
+      )}
+      {/* Sección de Pending Software */}
+      {activeTab === 'pending' && (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-medium leading-none tracking-tight">{t('Pending Software')}</h2>
+            <div className="flex space-x-2">
+     
+            </div>
+          </div>
+          
+          {pendingSoftware.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              {t('No pending software')}
+            </div>
+          ) : (
+            <Table
+              cols={pendingCols}
+              body={pendingSoftware.map((software) => ({
+                id: software.id,
+                cells: [
+                  { text: software.softwareName, wrap: true },
+                  { text: software.windowsEXE || '-', wrap: true },
+                  { text: software.macosEXE || '-', wrap: true },
+                  { text: software.version, wrap: true },
+                  { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
+                  ...(canAccess('team_software', ['delete'])
+                    ? [{
+                        buttons: [
+                          {
+                            color: 'success',
+                            text: t('approve'),
+                            onClick: () => approveSoftware(software),
+                          },
+                          {
+                            color: 'error',
+                            text: t('remove'),
+                            onClick: () => {
+                              setSelectedSoftware(software);
+                              setConfirmationDialogVisible(true);
+                            },
+                          },
+                        ],
+                      }]
+                    : []),
+                ],
+              }))}
+            />
+          )}
+        </div>
+      )}
       {/* Confirmation Dialog for Deletion */}
       <ConfirmationDialog
         visible={confirmationDialogVisible}
@@ -336,7 +447,7 @@ const SoftwareTable = () => {
             windowsEXE: '',
             macosEXE: '',
             version: '',
-            approved: true,
+            approved: false,
           }}
           validationSchema={SoftwareSchema}
           onSubmit={addSoftware}
