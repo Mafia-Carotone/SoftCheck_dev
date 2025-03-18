@@ -15,6 +15,8 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import * as XLSX from 'xlsx';
 import * as Yup from 'yup';
 import { Formik } from 'formik';
+// Importar desde el archivo centralizado
+import { QuestionState, ValidationQuestion, validationQuestions, obtenerValorAprobacion } from '@/lib/validation/software-validation';
 
 // Extender el tipo Software para incluir todas las propiedades necesarias
 // Este tipo ahora mapea exactamente a nuestro modelo Prisma actualizado
@@ -47,6 +49,9 @@ const SoftwareTable = () => {
   const [confirmationDialogVisible, setConfirmationDialogVisible] = useState(false);
   const [selectedSoftware, setSelectedSoftware] = useState<ExtendedSoftware | null>(null);
   const [addSoftwareModalVisible, setAddSoftwareModalVisible] = useState(false);
+  // Nuevo estado para el modal de validación
+  const [validationModalVisible, setValidationModalVisible] = useState(false);
+  const [softwareToValidate, setSoftwareToValidate] = useState<ExtendedSoftware | null>(null);
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
 
@@ -116,7 +121,69 @@ const SoftwareTable = () => {
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
-  // Función para aprobar software - ahora actualizada para depurar mejor
+  // Función para iniciar el proceso de validación
+  const startValidation = useCallback((software: ExtendedSoftware) => {
+    setSoftwareToValidate(software);
+    setValidationModalVisible(true);
+  }, []);
+
+  // Función para procesar el resultado de la validación
+  const processValidationResult = useCallback(async (values: Record<string, string>, software: ExtendedSoftware) => {
+    const teamSlug = router.query.slug as string;
+    
+    // Determinar si el software pasa la validación usando la función importada
+    const isApproved = obtenerValorAprobacion(values);
+    
+    // Estado final basado en la validación
+    const finalStatus = isApproved ? 'approved' : 'denied';
+    
+    try {
+      console.log(`Procesando validación de software (${finalStatus}):`, { id: software.id, teamSlug, values });
+      
+      toast.loading(finalStatus === 'approved' 
+        ? t('approving-software') 
+        : t('denying-software'), { id: 'validation-toast' });
+      
+      // Guardar las respuestas de la validación en el campo answers
+      const answers = {
+        ...software.answers,
+        validation: values,
+        validationResult: finalStatus,
+        validatedAt: new Date().toISOString(),
+        validatedBy: session?.user?.email || 'unknown'
+      };
+      
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software?id=${software.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: finalStatus,
+          answers
+        })
+      });
+
+      const data = await response.json();
+      console.log('Respuesta de la API:', data);
+
+      if (!response.ok) {
+        throw Error(data.error?.message || `Error al ${finalStatus === 'approved' ? 'aprobar' : 'denegar'} el software`);
+      }
+
+      await mutateSoftwareList();
+      toast.success(finalStatus === 'approved' 
+        ? t('software-approved') 
+        : t('software-denied'), { id: 'validation-toast' });
+      
+      setValidationModalVisible(false);
+    } catch (error: any) {
+      console.error(`Error en la validación (${finalStatus}):`, error);
+      toast.error(error.message || `Error al ${finalStatus === 'approved' ? 'aprobar' : 'denegar'} el software`, { id: 'validation-toast' });
+    }
+  }, [router.query.slug, mutateSoftwareList, t, session]);
+
+  // Esta función ya no se usa directamente, pero la mantenemos por si se necesita
   const approveSoftware = useCallback(async (software: ExtendedSoftware) => {
     const teamSlug = router.query.slug as string;
     try {
@@ -149,7 +216,6 @@ const SoftwareTable = () => {
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
-  // Función para denegar software - ahora usa "denied" en lugar de "rejected"
   const denySoftware = useCallback(async (software: ExtendedSoftware) => {
     const teamSlug = router.query.slug as string;
     try {
@@ -362,6 +428,16 @@ const SoftwareTable = () => {
     status: Yup.string().default('pending'),
   });
 
+  // Esquema de validación para el formulario de validación
+  const ValidationSchema = Yup.object().shape(
+    validationQuestions.reduce((schema, question) => {
+      return {
+        ...schema,
+        [question.id]: Yup.string().required('Este campo es obligatorio')
+      };
+    }, {})
+  );
+
   return (
     <div className="space-y-8">
       {/* Tabs para navegación entre Pending y Approved */}
@@ -488,8 +564,8 @@ const SoftwareTable = () => {
                         buttons: [
                           {
                             color: 'success',
-                            text: t('approve'),
-                            onClick: () => approveSoftware(software),
+                            text: t('validate'),
+                            onClick: () => startValidation(software),
                           },
                           {
                             color: 'warning',
@@ -719,6 +795,116 @@ const SoftwareTable = () => {
                   loading={isSubmitting}
                 >
                   {t('save')}
+                </Button>
+              </Modal.Actions>
+            </form>
+          )}
+        </Formik>
+      </Modal>
+
+      {/* Modal para validación de software */}
+      <Modal open={validationModalVisible}>
+        <Button 
+          className="absolute right-2 top-2" 
+          size="sm" 
+          shape="circle" 
+          onClick={() => setValidationModalVisible(false)}
+        >
+          ✕
+        </Button>
+        <Modal.Header>
+          <h3 className="font-bold text-lg">Validación de software: {softwareToValidate?.softwareName}</h3>
+        </Modal.Header>
+        <Formik
+          initialValues={validationQuestions.reduce((values, q) => {
+            return { ...values, [q.id]: 'unknown' };
+          }, {})}
+          validationSchema={ValidationSchema}
+          onSubmit={(values) => {
+            if (softwareToValidate) {
+              processValidationResult(values, softwareToValidate);
+            }
+          }}
+        >
+          {({
+            values,
+            errors,
+            touched,
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            isSubmitting,
+            setFieldValue
+          }) => (
+            <form onSubmit={handleSubmit}>
+              <Modal.Body>
+                <div className="space-y-4">
+                  {/* Información básica del software */}
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md mb-4">
+                    <p><strong>Nombre:</strong> {softwareToValidate?.softwareName}</p>
+                    <p><strong>Versión:</strong> {softwareToValidate?.version || '-'}</p>
+                    <p><strong>Fuente:</strong> {softwareToValidate?.downloadSource || '-'}</p>
+                    <p><strong>SHA256:</strong> {softwareToValidate?.sha256 || '-'}</p>
+                    <p><strong>Solicitado por:</strong> {softwareToValidate?.requestedBy || '-'}</p>
+                  </div>
+                  
+                  {/* Preguntas de validación */}
+                  {validationQuestions.map((question) => (
+                    <div className="form-control w-full" key={question.id}>
+                      <label className="label">
+                        <span className={`label-text ${question.criticalForApproval ? 'font-semibold' : ''}`}>
+                          {question.question}
+                          {question.criticalForApproval && 
+                            <span className="text-red-500 ml-1">*</span>
+                          }
+                        </span>
+                      </label>
+                      
+                      <div className="flex flex-col space-y-2">
+                        {question.options.map(option => (
+                          <label key={option.value} className="label cursor-pointer justify-start">
+                            <input
+                              type="radio"
+                              name={question.id.toString()}
+                              className="radio mr-2"
+                              value={option.value}
+                              checked={values[question.id] === option.value}
+                              onChange={() => setFieldValue(question.id.toString(), option.value)}
+                            />
+                            <span className="label-text">{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      
+                      {errors[question.id] && touched[question.id] && (
+                        <label className="label">
+                          <span className="label-text-alt text-error">{errors[question.id]}</span>
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md">
+                    <p className="text-sm text-blue-600 dark:text-blue-300">
+                      Las preguntas marcadas con <span className="text-red-500">*</span> son críticas para la aprobación. 
+                      Responder negativamente a cualquiera de ellas resultará en la denegación automática del software.
+                    </p>
+                  </div>
+                </div>
+              </Modal.Body>
+              <Modal.Actions>
+                <Button 
+                  onClick={() => setValidationModalVisible(false)} 
+                  color="ghost"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  color="primary" 
+                  loading={isSubmitting}
+                >
+                  Finalizar validación
                 </Button>
               </Modal.Actions>
             </form>

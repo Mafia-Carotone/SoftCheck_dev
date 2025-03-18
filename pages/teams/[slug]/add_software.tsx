@@ -2,7 +2,7 @@ import { GetServerSidePropsContext } from 'next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import type { NextPageWithLayout } from 'types';
 import { useTranslation } from 'next-i18next';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { slug } from '@/lib/zod/primitives';
@@ -10,175 +10,173 @@ import { Team } from '@prisma/client';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 import { PDFDocument, rgb } from 'pdf-lib';
+import { TeamTab } from '@/components/team';
+import useTeam from 'hooks/useTeam';
+import { Loading, Error } from '@/components/shared';
+import { Button, Card, Form, Input, Modal } from 'react-daisyui';
+import { useSession } from 'next-auth/react';
+import { v4 as uuidv4 } from 'uuid';
 
 // Extender jsPDF con autoTable
 (jsPDF as any).API.autoTable = autoTable;
 
-// Estado para controlar el flujo del cuestionario
-enum QuestionState {
-  PRIVACY_POLICY = 0,
-  CERTIFICACIONES_SEC = 1,
-  VULNERABILIDADES_ACTIVAS = 2,
-  QUIEN_LO_DESARROLLA = 3,
-  FRECUENCIA_UPDATE = 4,
-  VULNERABILIDADES_ANTIGUAS = 5,
-  VERSIONES_TROYANIZADAS = 6,
-  RESULT = 7
+// Importar desde el archivo centralizado en lugar de definir localmente
+import { QuestionState, ValidationQuestion, validationQuestions, obtenerValorAprobacion } from '@/lib/validation/software-validation';
+
+// Definir los estados de flujo de la aplicación
+enum FlowState {
+  INITIAL_DATA = -1, // Nuevo estado para ingresar datos del software
+  VALIDATION = 0,    // Estado para el cuestionario de validación
+  RESULT = 7         // Estado para mostrar el resultado
 }
 
 const Products: NextPageWithLayout = () => {
-  const { t } = useTranslation('common');
   const router = useRouter();
-  const [currentState, setCurrentState] = useState<QuestionState>(QuestionState.PRIVACY_POLICY);
+  const { data: session } = useSession();
+  const { t } = useTranslation('common');
+  const { isLoading, isError, team } = useTeam();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estado principal para controlar el flujo de la aplicación
+  const [flowState, setFlowState] = useState<FlowState>(FlowState.INITIAL_DATA);
+  
+  // Estado para las preguntas de validación
+  const [currentQuestion, setCurrentQuestion] = useState<QuestionState>(QuestionState.PRIVACY_POLICY);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [result, setResult] = useState<{ approved: string, message?: string }>({ approved: '' });
-  const [softwareName, setSoftwareName] = useState<string>('');
-  const [softwareID, setID] = useState<string>(() => {
-    // Generar un ID único al inicio
-    return Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
-  });
-  const [softwareWindowsEXE, setWindowsEXE] = useState<string>('');
-  const [softwareMacosEXE, setMacosEXE] = useState<string>('');
-  const [softwareVersion, setVersion] = useState<string>('');
-  const [addedToDatabase, setAddedToDatabase] = useState<boolean>(false);
-
-  // Función para avanzar al siguiente estado
-  const nextState = () => {
-    setCurrentState(prevState => prevState + 1 as QuestionState);
-  };
-
-  // Función para manejar selección de respuesta
-  const handleAnswer = (key: string, value: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    nextState();
-  };
-
-  // Función para obtener el valor de aprobación (adaptada del script)
-  const obtenerValorAprobacion = (vulnerabilidades_activas: string, quien_lo_desarrolla: string, frecuencia_update: string, vulnerabilidades_antiguas: string) => {
-    // Ajustamos la frecuencia_update para que coincida con los términos del algoritmo
-    let frecuencia = frecuencia_update;
-    if (frecuencia_update === "Mensual") {
-      frecuencia = "Menos de 1 mes";
+  
+  // Estados para los datos básicos del software
+  const [softwareName, setSoftwareName] = useState('');
+  const [version, setVersion] = useState('');
+  const [downloadSource, setDownloadSource] = useState('');
+  const [launcher, setLauncher] = useState('');
+  const [fileSize, setFileSize] = useState('');
+  const [sha256, setSha256] = useState('');
+  const [md5, setMd5] = useState('');
+  const [requestedBy, setRequestedBy] = useState('');
+  
+  // Función para validar los datos iniciales del software
+  const validateInitialData = (): boolean => {
+    if (!softwareName.trim()) {
+      toast.error('El nombre del software es obligatorio');
+      return false;
     }
     
-    // Condición específica solicitada
-    if (quien_lo_desarrolla === "Multinacional" && vulnerabilidades_activas === "Si" && frecuencia === "Menos de 1 mes") {
-      return { approved: "No", message: "Vuelve a pedirlo dentro de un mes" };
-    } else if (quien_lo_desarrolla === "Comunidad" && ["Menos de 1 mes", "1-3 meses"].includes(vulnerabilidades_antiguas)) {
-      return { approved: "No", message: "" };
-    } else if (quien_lo_desarrolla === "Multinacional" && vulnerabilidades_antiguas === "Menos de 1 mes") {
-      return { approved: "No", message: "" };
-    } else if (vulnerabilidades_activas === "Si" || quien_lo_desarrolla === "Dev unico" || frecuencia_update === "Anual") {
-      return { approved: "No", message: "" };
-    }
-    return { approved: "Si" };
+    return true;
   };
-
-  // Función para añadir el software a la base de datos
+  
+  // Función para iniciar el proceso de validación después de capturar datos iniciales
+  const startValidation = () => {
+    if (validateInitialData()) {
+      setFlowState(FlowState.VALIDATION);
+      setCurrentQuestion(QuestionState.PRIVACY_POLICY);
+    }
+  };
+  
+  // Función para avanzar a la siguiente pregunta de validación
+  const nextQuestion = () => {
+    if (currentQuestion < QuestionState.RESULT) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      // Si llegamos al final de las preguntas, mostrar el resultado
+      setFlowState(FlowState.RESULT);
+    }
+  };
+  
+  // Función para manejar las respuestas de validación
+  const handleAnswer = (key: string, value: string) => {
+    setAnswers({ ...answers, [key]: value });
+    
+    // Si es la última pregunta, pasar a resultados
+    if (currentQuestion === QuestionState.VERSIONES_TROYANIZADAS) {
+      setFlowState(FlowState.RESULT);
+    } else {
+      nextQuestion();
+    }
+  };
+  
+  // Usar la función centralizada para determinar si se aprueba
+  const determinarAprobacion = () => {
+    return obtenerValorAprobacion(answers);
+  };
+  
+  // Función para agregar el software a la base de datos
   const addToDatabase = async () => {
-    if (!router.isReady) {
-      toast.error("Espere un momento mientras se carga la página");
-      return;
-    }
-
-    const teamSlug = router.query.slug;
-    console.log("Team slug:", teamSlug); // Debugging
-
-    if (!teamSlug || typeof teamSlug !== 'string') {
-      toast.error("Error: No se pudo determinar el equipo");
-      return;
-    }
-
-    // Validación de campos obligatorios
-    if (!softwareName || !softwareName.trim()) {
-      toast.error("El nombre del software es obligatorio");
-      return;
-    }
-
-    if (!softwareVersion || !softwareVersion.trim()) {
-      toast.error("La versión del software es obligatoria");
-      return;
-    }
-
-    if (!softwareID) {
-      toast.error("Error: No se pudo generar el ID del software");
-      return;
-    }
-
-    // Construir el payload
-    const payload = {
-      id: softwareID,
-      softwareName: softwareName.trim(),
-      version: softwareVersion.trim(),
-      windowsEXE: softwareWindowsEXE?.trim() || null,
-      macosEXE: softwareMacosEXE?.trim() || null,
-      answers: answers || {},
-      approved: result.approved === "Si",
-      teamId: teamSlug // Añadir el teamId usando el slug
-    };
-
-    console.log("Sending payload:", payload); // Debugging
-
+    if (!team) return;
+    
     try {
-      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+      toast.loading(t('adding-software'), { id: 'add-software' });
+      
+      // Determinar el estado basado en la evaluación
+      const isApproved = determinarAprobacion();
+      const finalStatus = isApproved ? 'approved' : 'denied';
+      
+      // Calcular fileSize en bytes si se proporcionó
+      const fileSizeInBytes = fileSize.trim() 
+        ? parseInt(fileSize) * 1024 * 1024  // Convertir MB a bytes
+        : null;
+      
+      // Crear los datos del software
+      const softwareData = {
+        id: uuidv4(),
+        teamId: team.id,
+        userId: session?.user?.id || '',
+        softwareName,
+        version: version || null,
+        downloadSource: downloadSource || null,
+        launcher: launcher || null,
+        fileSize: fileSizeInBytes,
+        sha256: sha256 || null,
+        md5: md5 || null,
+        requestedBy: requestedBy || null,
+        status: finalStatus,
+        answers
+      };
+      
+      // Llamar a la API para crear el software
+      const response = await fetch(`/api/teams/${team.slug}/software`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(softwareData)
       });
-
-      console.log("Response status:", response.status); // Debugging
+      
       const data = await response.json();
-      console.log("Response data:", data); // Debugging
-
+      
       if (!response.ok) {
-        throw new Error(data.error?.message || 'Error al añadir el software a la base de datos');
+        throw Error(data.error?.message || 'Error al añadir el software');
       }
-
-      setAddedToDatabase(true);
-      toast.success('Software añadido con éxito');
+      
+      toast.success(t('software-added'), { id: 'add-software' });
+      
+      // Resetear el estado después de agregar el software
+      resetForm();
       
     } catch (error: any) {
-      console.error('Error al crear software:', error);
-      toast.error(error.message || 'Error al conectar con la base de datos');
+      console.error('Error al añadir software:', error);
+      toast.error(error.message || t('error-adding-software'), { id: 'add-software' });
     }
   };
-
-  // Función para reiniciar el cuestionario
-  const resetQuiz = () => {
-    setCurrentState(QuestionState.PRIVACY_POLICY);
-    setAnswers({});
-    setResult({ approved: '' });
+  
+  // Función para reiniciar todo el formulario
+  const resetForm = () => {
+    // Resetear datos básicos
     setSoftwareName('');
-    setID(Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join(''));
-    setWindowsEXE('');
-    setMacosEXE('');
     setVersion('');
-    setAddedToDatabase(false);
+    setDownloadSource('');
+    setLauncher('');
+    setFileSize('');
+    setSha256('');
+    setMd5('');
+    setRequestedBy('');
+    
+    // Resetear validación
+    setAnswers({});
+    setCurrentQuestion(QuestionState.PRIVACY_POLICY);
+    
+    // Volver al inicio
+    setFlowState(FlowState.INITIAL_DATA);
   };
-
-  // Efecto para calcular el resultado cuando se han respondido todas las preguntas
-  useEffect(() => {
-    if (currentState === QuestionState.RESULT) {
-      const aprobacion = obtenerValorAprobacion(
-        answers.vulnerabilidades_activas,
-        answers.quien_lo_desarrolla,
-        answers.frecuencia_update,
-        answers.vulnerabilidades_antiguas
-      );
-      
-      let mensaje = aprobacion.message || "";
-      if (aprobacion.approved === "Si" && answers.versiones_troyanizadas === "Si") {
-        mensaje += " Existen versiones troyanizadas, debes enviar el enlace de descarga oficial.";
-      }
-      
-      setResult({ approved: aprobacion.approved, message: mensaje });
-    }
-  }, [currentState, answers]);
 
   // Función para descargar reporte en formato PDF
   const handleDownloadPDF = async () => {
@@ -196,7 +194,7 @@ const Products: NextPageWithLayout = () => {
         color: rgb(0, 0, 0),
       });
 
-      const resultadoText = `Resultado: ${result.approved === "Si" ? "APROBADO" : "NO APROBADO"}`;
+      const resultadoText = `Resultado: ${determinarAprobacion() ? "APROBADO" : "NO APROBADO"}`;
       page.drawText(resultadoText, {
         x: 50,
         y: height - 80,
@@ -204,35 +202,41 @@ const Products: NextPageWithLayout = () => {
         color: rgb(0, 0, 0),
       });
 
-      if (result.message) {
-        page.drawText(`Comentario: ${result.message}`, {
+      // Información básica del software
+      page.drawText(`Software: ${softwareName}`, {
+        x: 50,
+        y: height - 110,
+        size: 10,
+        color: rgb(0, 0, 0),
+      });
+
+      if (version) {
+        page.drawText(`Versión: ${version}`, {
           x: 50,
-          y: height - 100,
-          size: 12,
+          y: height - 130,
+          size: 10,
           color: rgb(0, 0, 0),
         });
       }
 
-      // Datos para la tabla
-      const tableData = [
-        ["Política de privacidad", answers.privacy_policy || "N/A"],
-        ["Certificaciones de seguridad", answers.certificaciones_sec || "N/A"],
-        ["Vulnerabilidades activas", answers.vulnerabilidades_activas || "N/A"],
-        ["Desarrollador", answers.quien_lo_desarrolla || "N/A"],
-        ["Frecuencia de actualización", answers.frecuencia_update || "N/A"],
-        ["Vulnerabilidades antiguas", answers.vulnerabilidades_antiguas || "N/A"],
-        ["Versiones troyanizadas", answers.versiones_troyanizadas || "N/A"]
-      ];
-
-      let yPosition = height - 130;
-      tableData.forEach(([question, answer]) => {
-        page.drawText(`${question}: ${answer}`, {
-          x: 50,
-          y: yPosition,
-          size: 10,
-          color: rgb(0, 0, 0),
-        });
-        yPosition -= 20;
+      // Datos para la tabla de respuestas
+      let yPosition = height - 160;
+      
+      // Dibujar las respuestas de validación
+      Object.entries(answers).forEach(([key, value]) => {
+        const question = validationQuestions.find(q => q.id.toString() === key);
+        if (question) {
+          const option = question.options.find(o => o.value === value);
+          const answerText = option ? option.label : value;
+          
+          page.drawText(`${question.question}: ${answerText}`, {
+            x: 50,
+            y: yPosition,
+            size: 10,
+            color: rgb(0, 0, 0),
+          });
+          yPosition -= 20;
+        }
       });
 
       // Guardar PDF
@@ -241,7 +245,7 @@ const Products: NextPageWithLayout = () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'evaluacion_software.pdf';
+      link.download = `evaluacion_${softwareName.replace(/\s+/g, '_')}.pdf`;
       link.click();
 
       // Liberar el objeto URL
@@ -261,21 +265,25 @@ const Products: NextPageWithLayout = () => {
       // Construir el contenido del texto
       let content = "REPORTE DE EVALUACIÓN DE SOFTWARE\n";
       content += "====================================\n\n";
-      content += `RESULTADO: ${result.approved === "Si" ? "APROBADO" : "NO APROBADO"}\n`;
+      content += `Software: ${softwareName}\n`;
+      if (version) content += `Versión: ${version}\n`;
+      if (downloadSource) content += `Fuente: ${downloadSource}\n`;
+      content += "\n";
+      content += `RESULTADO: ${determinarAprobacion() ? "APROBADO" : "NO APROBADO"}\n`;
       
-      if (result.message) {
-        content += `COMENTARIO: ${result.message}\n`;
-      }
-      
-      content += "\nRESPUESTAS:\n";
+      content += "\nRESPUESTAS DE VALIDACIÓN:\n";
       content += "------------------------------------\n";
-      content += `Política de privacidad: ${answers.privacy_policy || "N/A"}\n`;
-      content += `Certificaciones de seguridad: ${answers.certificaciones_sec || "N/A"}\n`;
-      content += `Vulnerabilidades activas: ${answers.vulnerabilidades_activas || "N/A"}\n`;
-      content += `Desarrollador: ${answers.quien_lo_desarrolla || "N/A"}\n`;
-      content += `Frecuencia de actualización: ${answers.frecuencia_update || "N/A"}\n`;
-      content += `Vulnerabilidades antiguas: ${answers.vulnerabilidades_antiguas || "N/A"}\n`;
-      content += `Versiones troyanizadas: ${answers.versiones_troyanizadas || "N/A"}\n`;
+      
+      // Agregar cada respuesta al texto
+      Object.entries(answers).forEach(([key, value]) => {
+        const question = validationQuestions.find(q => q.id.toString() === key);
+        if (question) {
+          const option = question.options.find(o => o.value === value);
+          const answerText = option ? option.label : value;
+          content += `${question.question}: ${answerText}\n`;
+        }
+      });
+      
       content += "\n------------------------------------\n";
       content += `Fecha de evaluación: ${new Date().toLocaleDateString()}\n`;
       
@@ -284,7 +292,7 @@ const Products: NextPageWithLayout = () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "evaluacion_software.txt";
+      link.download = `evaluacion_${softwareName.replace(/\s+/g, '_')}.txt`;
       link.click();
       
       // Liberar el objeto URL
@@ -298,12 +306,12 @@ const Products: NextPageWithLayout = () => {
     }
   };
 
-  // Renderizado del progreso
+  // Renderizado del progreso de validación
   const renderProgress = () => {
-    if (currentState === QuestionState.RESULT) return null;
+    if (flowState !== FlowState.VALIDATION) return null;
     
-    const totalSteps = 8; // Total de preguntas
-    const currentStep = currentState + 1;
+    const totalSteps = 7; // Total de preguntas de validación
+    const currentStep = currentQuestion + 1;
     const progressPercentage = (currentStep / totalSteps) * 100;
     
     return (
@@ -322,315 +330,260 @@ const Products: NextPageWithLayout = () => {
     );
   };
 
-  // Renderizado de preguntas según el estado actual
-  const renderQuestion = () => {
-    switch (currentState) {
-      case QuestionState.PRIVACY_POLICY:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">¿Tiene política de privacidad?</h3>
-            <div className="space-y-3">
-              {["Tiene", "No tiene"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('privacy_policy', option)}
-                  className="w-full p-3 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.CERTIFICACIONES_SEC:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Cuenta con certificaciones de seguridad?</h3>
-            <div className="space-y-3">
-              {["Si", "No"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('certificaciones_sec', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.VULNERABILIDADES_ACTIVAS:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Existen vulnerabilidades activas?</h3>
-            <div className="space-y-3">
-              {["Si", "No"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('vulnerabilidades_activas', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.QUIEN_LO_DESARROLLA:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Quién desarrolló el software?</h3>
-            <div className="space-y-3">
-              {["Comunidad", "Multinacional", "Dev unico"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('quien_lo_desarrolla', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.FRECUENCIA_UPDATE:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Con qué frecuencia se actualiza?</h3>
-            <div className="space-y-3">
-              {["Mensual", "Trimestral", "Anual"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('frecuencia_update', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.VULNERABILIDADES_ANTIGUAS:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Cuando se reportaron las vulnerabilidades antiguas?</h3>
-            <div className="space-y-3">
-              {["Menos de 1 mes", "1-3 meses", "Más de 3 meses"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('vulnerabilidades_antiguas', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.VERSIONES_TROYANIZADAS:
-        return (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">¿Existen versiones troyanizadas del software?</h3>
-            <div className="space-y-3">
-              {["Si", "No"].map(option => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer('versiones_troyanizadas', option)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      
-      case QuestionState.RESULT:
-        return (
-          <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">Resultado de la evaluación</h2>
-            <div className="text-center mb-6">
-              <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${
-                result.approved === "Si" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-              } mb-4`}>
-                <span className="text-3xl font-bold">{result.approved}</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-                {result.approved === "Si" ? "Software Aprobado" : "Software No Aprobado"}
-              </h3>
-              {result.message && (
-                <p className="text-gray-700 dark:text-gray-300">{result.message}</p>
-              )}
-            </div>
-            
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Descargar reporte:</h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleDownloadTXT}
-                  className="flex-1 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Descargar TXT
-                </button>
-                <button
-                  onClick={handleDownloadPDF}
-                  className="flex-1 p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Descargar PDF
-                </button>
-              </div>
-            </div>
-            
-            {result.approved === "Si" && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Añadir a la base de datos:</h3>
-                {!addedToDatabase ? (
-                  <div className="space-y-3">
-                    <div className="flex flex-col">
-                      <label htmlFor="softwareName" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Nombre del software
-                      </label>
-                      <input
-                        id="softwareName"
-                        type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
-                        placeholder="Introduzca el nombre del software"
-                        value={softwareName}
-                        onChange={(e) => setSoftwareName(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label htmlFor="windowsEXE" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Ejecutable en Windows (.exe)
-                      </label>
-                      <input
-                        id="windowsEXE"
-                        type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
-                        placeholder="Nombre del archivo .exe"
-                        value={softwareWindowsEXE}
-                        onChange={(e) => setWindowsEXE(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label htmlFor="macosEXE" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Ejecutable en MacOS (.dmg)
-                      </label>
-                      <input
-                        id="macosEXE"
-                        type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
-                        placeholder="Nombre del archivo .dmg"
-                        value={softwareMacosEXE}
-                        onChange={(e) => setMacosEXE(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label htmlFor="version" className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Versión del software
-                      </label>
-                      <input
-                        id="version"
-                        type="text"
-                        className="p-3 border rounded-lg focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
-                        placeholder="Versión del software"
-                        value={softwareVersion}
-                        onChange={(e) => setVersion(e.target.value)}
-                      />
-                    </div>
-
-                    <button
-                      onClick={addToDatabase}
-                      className="w-full p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Añadir a base de datos
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 rounded-lg">
-                    <p className="font-medium">¡Software añadido correctamente!</p>
-                    <p className="text-sm mt-1">Se ha añadido "{softwareName}" a la base de datos.</p>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Resumen de respuestas:</h3>
-              <div className="space-y-2">
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Política de privacidad:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.privacy_policy}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Términos de servicio:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.terms_of_service}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">EULA:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.eula}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Certificaciones de seguridad:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.certificaciones_sec}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Vulnerabilidades activas:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.vulnerabilidades_activas}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Desarrollador:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.quien_lo_desarrolla}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Frecuencia de actualización:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.frecuencia_update}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Vulnerabilidades antiguas:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.vulnerabilidades_antiguas}</p>
-                </div>
-                <div className="p-3 border dark:border-gray-600 rounded bg-white dark:bg-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Versiones troyanizadas:</p>
-                  <p className="text-gray-700 dark:text-gray-300">{answers.versiones_troyanizadas}</p>
-                </div>
-              </div>
-            </div>
-            
-            <button
-              onClick={resetQuiz}
-              className="w-full p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Reiniciar Evaluación
-            </button>
-          </div>
-        );
-      
-      default:
-        return <div>Error en el cuestionario.</div>;
-    }
+  // Renderizado del formulario inicial para datos del software
+  const renderInitialDataForm = () => {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold mb-4">Información del Software</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+          Por favor, introduzca la información básica del software que desea añadir.
+          Los campos marcados con * son obligatorios.
+        </p>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Nombre del Software*</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={softwareName}
+            onChange={(e) => setSoftwareName(e.target.value)}
+            placeholder="Ej: Microsoft Office"
+            required
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Versión</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            placeholder="Ej: 2021"
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Fuente de descarga</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={downloadSource}
+            onChange={(e) => setDownloadSource(e.target.value)}
+            placeholder="Ej: https://microsoft.com/office"
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Launcher</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={launcher}
+            onChange={(e) => setLauncher(e.target.value)}
+            placeholder="Ej: office365.exe"
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Tamaño del archivo (MB)</span>
+          </label>
+          <input
+            type="number"
+            className="input input-bordered w-full"
+            value={fileSize}
+            onChange={(e) => setFileSize(e.target.value)}
+            placeholder="Ej: 1024"
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">SHA256 (opcional)</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={sha256}
+            onChange={(e) => setSha256(e.target.value)}
+            placeholder="Hash SHA256 del archivo"
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">MD5 (opcional)</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={md5}
+            onChange={(e) => setMd5(e.target.value)}
+            placeholder="Hash MD5 del archivo"
+          />
+        </div>
+        
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Solicitado por</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={requestedBy}
+            onChange={(e) => setRequestedBy(e.target.value)}
+            placeholder="Nombre de quien solicita"
+          />
+        </div>
+        
+        <div className="pt-4 flex justify-end">
+          <Button 
+            color="primary" 
+            onClick={startValidation}
+          >
+            Continuar a Validación
+          </Button>
+        </div>
+      </div>
+    );
   };
 
-  return (
-    <div className="p-3">
-      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Add a new software</h1>
-      <p className="text-sm mb-6 text-gray-700 dark:text-gray-300">Completa el siguiente cuestionario para evaluar si el software puede ser añadido.</p>
-      
-      <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        {renderProgress()}
-        {renderQuestion()}
+  // Renderizado de preguntas según el estado actual
+  const renderValidationQuestion = () => {
+    // Encontrar la pregunta actual
+    const questionData = validationQuestions.find(q => q.id === currentQuestion);
+    
+    if (!questionData) return null;
+    
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">{questionData.question}</h3>
+        <div className="space-y-2">
+          {questionData.options.map((option) => (
+            <button
+              key={option.value}
+              className="w-full p-3 text-left border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAnswer(currentQuestion.toString(), option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Renderizado del resultado final
+  const renderResult = () => {
+    const isApproved = determinarAprobacion();
+    
+    return (
+      <div className="space-y-4">
+        <div className={`text-center p-4 rounded-lg ${isApproved ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <h3 className="text-xl font-bold">
+            {isApproved ? 'Software Aprobado' : 'Software No Aprobado'}
+          </h3>
+          <p className="mt-2">
+            {isApproved 
+              ? 'El software cumple con los criterios de seguridad y puede ser añadido a la base de datos.' 
+              : 'El software no cumple con los criterios mínimos de seguridad.'}
+          </p>
+        </div>
+        
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mt-4">
+          <h4 className="font-medium mb-2">Resumen de la evaluación:</h4>
+          <ul className="space-y-1 text-sm">
+            {Object.entries(answers).map(([key, value]) => {
+              const question = validationQuestions.find(q => q.id.toString() === key);
+              if (!question) return null;
+              
+              const option = question.options.find(o => o.value === value);
+              const answerText = option ? option.label : value;
+              
+              return (
+                <li key={key} className="flex justify-between">
+                  <span className="font-medium">{question.question.substring(0, 40)}...</span>
+                  <span className={`
+                    ${value === 'yes' && question.id !== QuestionState.VULNERABILIDADES_ACTIVAS && question.id !== QuestionState.VERSIONES_TROYANIZADAS ? 'text-green-600' : ''}
+                    ${value === 'no' && (question.id === QuestionState.VULNERABILIDADES_ACTIVAS || question.id === QuestionState.VERSIONES_TROYANIZADAS) ? 'text-green-600' : ''}
+                    ${value === 'yes' && (question.id === QuestionState.VULNERABILIDADES_ACTIVAS || question.id === QuestionState.VERSIONES_TROYANIZADAS) ? 'text-red-600' : ''}
+                    ${value === 'no' && question.id !== QuestionState.VULNERABILIDADES_ACTIVAS && question.id !== QuestionState.VERSIONES_TROYANIZADAS ? 'text-red-600' : ''}
+                    ${value === 'unknown' ? 'text-yellow-600' : ''}
+                  `}>
+                    {answerText}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        
+        <div className="pt-4 flex flex-wrap gap-2 justify-between">
+          <div>
+            <Button color="ghost" onClick={resetForm} className="mr-2">
+              Comenzar de nuevo
+            </Button>
+            <Button color="accent" onClick={handleDownloadPDF} className="mr-2">
+              Descargar PDF
+            </Button>
+            <Button color="accent" onClick={handleDownloadTXT}>
+              Descargar TXT
+            </Button>
+          </div>
+          
+          <Button 
+            color="primary" 
+            onClick={addToDatabase}
+          >
+            Añadir a la base de datos
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // Renderizado según el estado del flujo
+  const renderContent = () => {
+    if (isLoading) {
+      return <Loading />;
+    }
+
+    if (isError) {
+      return <Error message={isError.message} />;
+    }
+
+    if (!team) {
+      return <Error message="Equipo no encontrado" />;
+    }
+    
+    return (
+      <div className="p-3">
+        <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Añadir nuevo software</h1>
+        <p className="text-sm mb-6 text-gray-700 dark:text-gray-300">
+          Complete la información y el cuestionario para evaluar si el software puede ser añadido.
+        </p>
+        
+        <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+          {renderProgress()}
+          
+          {flowState === FlowState.INITIAL_DATA && renderInitialDataForm()}
+          {flowState === FlowState.VALIDATION && renderValidationQuestion()}
+          {flowState === FlowState.RESULT && renderResult()}
+        </div>
+      </div>
+    );
+  };
+
+  return renderContent();
 };
 
 export async function getServerSideProps({
