@@ -335,7 +335,7 @@ function testApiUrls(currentIndex = 0) {
   const currentUrl = CONFIG.apiUrls[currentIndex];
   const pingUrl = `${currentUrl}${CONFIG.endpoints.ping}`;
   
-  console.log(`🔄 Probando URL #${currentIndex + 1}: ${pingUrl}`);
+  console.log(`🔄 Probando URL #${currentIndex + 1}/${CONFIG.apiUrls.length}: ${pingUrl}`);
   
   // Encabezados explícitos para forzar respuesta JSON
   const headers = {
@@ -605,6 +605,22 @@ function loadPendingDownloads() {
         if (download.sentAt) {
           const sentDate = new Date(download.sentAt);
           statusText += ` (${sentDate.toLocaleDateString()} ${sentDate.toLocaleTimeString()})`;
+        }
+      } else if (download.status === 'approved') {
+        statusText = download.autoProcessed ? 'Aprobado Automáticamente' : 'Aprobado';
+        statusClass = 'status-approved';
+        
+        // Añadir información adicional si está disponible
+        if (download.statusNotes) {
+          statusText += ` - ${download.statusNotes}`;
+        }
+      } else if (download.status === 'rejected') {
+        statusText = download.autoProcessed ? 'Rechazado Automáticamente' : 'Rechazado';
+        statusClass = 'status-rejected';
+        
+        // Añadir información adicional si está disponible
+        if (download.statusNotes) {
+          statusText += ` - ${download.statusNotes}`;
         }
       }
       

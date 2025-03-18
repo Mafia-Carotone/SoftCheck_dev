@@ -214,6 +214,93 @@ async function handleCreateRequest(
     
     console.log(`Procesando solicitud para software: "${softwareName}" versión "${version}"`);
     
+    // NUEVO: Verificar si el software ya existe para este equipo
+    const existingSoftware = await prisma.software.findFirst({
+      where: {
+        teamId: effectiveTeamId,
+        softwareName: {
+          equals: softwareName,
+          mode: 'insensitive' // Buscar sin importar mayúsculas/minúsculas
+        },
+        version: version || undefined
+      }
+    });
+    
+    // Si ya existe un software con el mismo nombre y versión
+    if (existingSoftware) {
+      console.log(`Software ya existente encontrado: ${existingSoftware.id}`);
+      
+      // Si ya está aprobado, automáticamente aprobamos esta solicitud
+      if (existingSoftware.status === 'approved') {
+        console.log(`El software "${softwareName}" ya está aprobado, aprobando automáticamente`);
+        
+        // Crear entrada en SoftwareRequest con estado "approved"
+        const newRequest = await prisma.softwareRequest.create({
+          data: {
+            fileName,
+            fileSize: fileSize || 0,
+            fileUrl: fileUrl || '',
+            downloadSource: downloadSource || 'Extension',
+            status: 'approved', // Automáticamente aprobado
+            notes: `Aprobado automáticamente. Este software ya fue aprobado previamente.`,
+            teamId: effectiveTeamId,
+            userId: existingSoftware.userId, // Usar el mismo usuario que aprobó originalmente
+            processedAt: new Date() // Procesado inmediatamente
+          }
+        });
+        
+        return res.status(200).json({
+          success: true,
+          id: newRequest.id,
+          fileName,
+          fileSize: fileSize || 0,
+          fileUrl: fileUrl || '',
+          downloadSource: downloadSource || 'Extension',
+          status: 'approved',
+          notes: `Aprobado automáticamente. Este software ya fue aprobado previamente.`,
+          teamId: effectiveTeamId,
+          createdAt: newRequest.createdAt,
+          autoApproved: true,
+          existingSoftwareId: existingSoftware.id
+        });
+      }
+      
+      // Si está rechazado, también rechazamos esta solicitud
+      if (existingSoftware.status === 'rejected' || existingSoftware.status === 'denied') {
+        console.log(`El software "${softwareName}" fue rechazado previamente, rechazando automáticamente`);
+        
+        // Crear entrada en SoftwareRequest con estado "rejected"
+        const newRequest = await prisma.softwareRequest.create({
+          data: {
+            fileName,
+            fileSize: fileSize || 0,
+            fileUrl: fileUrl || '',
+            downloadSource: downloadSource || 'Extension',
+            status: 'rejected', // Automáticamente rechazado
+            notes: `Rechazado automáticamente. Este software fue rechazado previamente.`,
+            teamId: effectiveTeamId,
+            userId: existingSoftware.userId, // Usar el mismo usuario que rechazó originalmente
+            processedAt: new Date() // Procesado inmediatamente
+          }
+        });
+        
+        return res.status(200).json({
+          success: true,
+          id: newRequest.id,
+          fileName,
+          fileSize: fileSize || 0,
+          fileUrl: fileUrl || '',
+          downloadSource: downloadSource || 'Extension',
+          status: 'rejected',
+          notes: `Rechazado automáticamente. Este software fue rechazado previamente.`,
+          teamId: effectiveTeamId,
+          createdAt: newRequest.createdAt,
+          autoRejected: true,
+          existingSoftwareId: existingSoftware.id
+        });
+      }
+    }
+    
     // Intentar obtener el userId del usuario asociado al equipo
     // Para una solicitud de la extensión sin usuario específico, usaremos el primer usuario admin o owner
     let userId = 'system'; // Valor por defecto si no encontramos un usuario

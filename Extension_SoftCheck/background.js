@@ -35,6 +35,14 @@ let pendingDownloads = [];
 chrome.downloads.onCreated.addListener((downloadItem) => {
   console.log('🔍 Nueva descarga detectada:', downloadItem);
   
+  // Verificar si el archivo es software antes de procesarlo
+  if (!isSoftwareFile(downloadItem)) {
+    console.log('⏭️ Descarga ignorada, no es software:', downloadItem.filename);
+    return;
+  }
+  
+  console.log('✅ Descarga de software detectada:', downloadItem.filename);
+  
   // Extraer información relevante del archivo
   const downloadInfo = {
     id: downloadItem.id,
@@ -202,14 +210,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           
           if (index !== -1) {
             if (result.success) {
-              // Actualizar estado a "sent" y guardar el ID de respuesta
+              // Determinar el estado según la respuesta
+              // Detectar si fue aprobado o rechazado automáticamente
+              const responseStatus = result.response.status || 'sent';
+              const isAutoApproved = result.response.autoApproved === true;
+              const isAutoRejected = result.response.autoRejected === true;
+              
+              // Actualizar estado según la respuesta
               updatedDownloads[index] = {
                 ...updatedDownloads[index],
-                status: 'sent',
+                status: responseStatus,
                 serverRequestId: result.response.id || null,
-                teamId: result.response.teamId || null, // Guardar el teamId devuelto por el servidor
-                sentAt: new Date().toISOString()
+                teamId: result.response.teamId || null,
+                sentAt: new Date().toISOString(),
+                // Añadir información adicional si fue auto-aprobado/rechazado
+                autoProcessed: isAutoApproved || isAutoRejected,
+                existingSoftwareId: result.response.existingSoftwareId || null,
+                statusNotes: result.response.notes || null
               };
+              
+              // Si fue auto-aprobado o rechazado, mostrar notificación específica
+              if (isAutoApproved || isAutoRejected) {
+                chrome.notifications.create({
+                  type: 'basic',
+                  iconUrl: isAutoApproved ? 'icon-approved.png' : 'icon-rejected.png',
+                  title: isAutoApproved ? 'Software Aprobado Automáticamente' : 'Software Rechazado Automáticamente',
+                  message: `${result.download.fileName}\n${result.response.notes || ''}`,
+                  priority: 2
+                });
+              }
             } else {
               // Marcar como error pero mantener en pendiente para reintentar
               updatedDownloads[index] = {
@@ -483,7 +512,9 @@ function isSoftwareFile(downloadItem) {
   
   console.log(`📋 El archivo ${filename} ${hasExtension ? 'ES' : 'NO es'} considerado software`);
   
-  // Considerar todos los archivos como software para fines de depuración
-  // Esto asegura que todas las descargas sean interceptadas durante las pruebas
+  // Descomentar esta línea para filtrar solo archivos de software reales
+  // return hasExtension;
+  
+  // Durante el desarrollo y pruebas, interceptar todas las descargas
   return true; // Interceptar todas las descargas para depuración
 } 
