@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('- download-item-template:', !!document.getElementById('download-item-template'));
   console.log('- saveConfigBtn:', !!document.getElementById('saveConfigBtn'));
   console.log('- sendAllBtn:', !!document.getElementById('sendAllBtn'));
+  console.log('- changeApiKeyBtn:', !!document.getElementById('changeApiKeyBtn'));
   
   // Verificar descargas pendientes directamente
   chrome.storage.local.get(['pendingDownloads'], function(result) {
@@ -107,6 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Obtener elementos del DOM
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const sendAllBtn = document.getElementById('sendAllBtn');
+    const changeApiKeyBtn = document.getElementById('changeApiKeyBtn');
     
     // Event listeners
     if (saveConfigBtn) {
@@ -121,6 +123,13 @@ document.addEventListener('DOMContentLoaded', function() {
       sendAllBtn.addEventListener('click', sendAllDownloads);
     } else {
       console.error('❌ No se encontró el botón sendAllBtn');
+    }
+    
+    if (changeApiKeyBtn) {
+      console.log('✅ Configurando listener para changeApiKeyBtn');
+      changeApiKeyBtn.addEventListener('click', showApiKeyChangeDialog);
+    } else {
+      console.error('❌ No se encontró el botón changeApiKeyBtn');
     }
     
     // Cargar y mostrar las descargas
@@ -174,13 +183,18 @@ function updateUI() {
         // Crear el botón
         apiKeyButton = document.createElement('button');
         apiKeyButton.id = 'changeApiKeyBtn';
-        apiKeyButton.className = 'button secondary';
-        apiKeyButton.innerHTML = '<span style="margin-right: 5px;">🔑</span> Cambiar API Key';
+        apiKeyButton.className = 'secondary-button';
+        apiKeyButton.innerHTML = '<i class="fas fa-key"></i> Cambiar API Key';
         
         // Añadir el botón al contenedor
         actionsContainer.appendChild(apiKeyButton);
         
         // Configurar evento
+        apiKeyButton.addEventListener('click', showApiKeyChangeDialog);
+        console.log('✅ Evento click configurado para el botón changeApiKeyBtn creado dinámicamente');
+      } else {
+        // Si el botón ya existe, asegurarse de que tenga el evento click
+        console.log('🔄 El botón changeApiKeyBtn ya existe, asegurando el evento click');
         apiKeyButton.addEventListener('click', showApiKeyChangeDialog);
       }
       
@@ -261,13 +275,6 @@ function saveConfiguration() {
     showStatus('El formato de la API key no es válido. Debe tener al menos 8 caracteres y contener solo letras, números, guiones, puntos o guiones bajos.', 'error');
     return;
   }
-  
-  // Determinar si es una API key de prueba o real
-  const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
-  const isTestKey = testApiKeys.includes(apiKey);
-  
-  console.log(`🔑 ${isTestKey ? 'API Key de prueba' : 'API Key real'} guardada:`, apiKey);
-  console.log('💾 Longitud de API Key:', apiKey.length);
   
   // Verificar si se seleccionó una URL de API
   let selectedApiUrl = CONFIG.apiUrl;
@@ -1181,6 +1188,8 @@ function updateApiKeyDisplay() {
 
 // Función para mostrar un diálogo de cambio de API key
 function showApiKeyChangeDialog() {
+  console.log('🔍 Función showApiKeyChangeDialog() llamada');
+  
   // Ocultar sección de descargas temporalmente
   const downloadsSection = document.getElementById('downloads-section');
   downloadsSection.style.display = 'none';
@@ -1189,6 +1198,7 @@ function showApiKeyChangeDialog() {
   let dialog = document.getElementById('apiKeyChangeDialog');
   
   if (!dialog) {
+    console.log('🔄 Creando nuevo diálogo para cambio de API Key');
     dialog = document.createElement('div');
     dialog.id = 'apiKeyChangeDialog';
     dialog.className = 'dialog';
@@ -1199,15 +1209,11 @@ function showApiKeyChangeDialog() {
         <div class="form-group">
           <label for="newApiKey">API Key:</label>
           <input type="text" id="newApiKey" class="input" placeholder="Ingresa tu API key">
-          <div id="newApiKeyHelp" style="font-size: 12px; color: #666; margin-top: 4px;">
-            API keys de prueba: test-api-key, dev-key, extension-key<br>
-            O ingresa una API key real proporcionada por tu administrador.
-          </div>
           <div id="newApiKeyValidIndicator" style="margin-top: 8px;"></div>
         </div>
         <div class="button-group">
-          <button id="saveNewApiKeyBtn" class="button primary">Guardar</button>
-          <button id="cancelApiKeyChangeBtn" class="button secondary">Cancelar</button>
+          <button id="saveNewApiKeyBtn" class="primary-button">Guardar</button>
+          <button id="cancelApiKeyChangeBtn" class="secondary-button">Cancelar</button>
         </div>
       </div>
     `;
@@ -1215,68 +1221,97 @@ function showApiKeyChangeDialog() {
     // Añadir al body
     document.body.appendChild(dialog);
     
-    // Configurar eventos
-    const newApiKeyInput = document.getElementById('newApiKey');
-    const saveNewApiKeyBtn = document.getElementById('saveNewApiKeyBtn');
-    const cancelApiKeyChangeBtn = document.getElementById('cancelApiKeyChangeBtn');
-    
-    // Validar API key mientras se escribe
-    newApiKeyInput.addEventListener('input', function() {
-      const currentValue = newApiKeyInput.value.trim();
-      
-      // Actualizar indicador de validez
-      const indicator = document.getElementById('newApiKeyValidIndicator');
-      if (isValidApiKey(currentValue)) {
-        // Determinar si es de prueba o real
-        const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
-        const isTestKey = testApiKeys.includes(currentValue);
-        
-        indicator.textContent = isTestKey 
-          ? '✅ API key de prueba válida' 
-          : '✅ Formato de API key válido';
-        indicator.style.color = 'green';
-        saveNewApiKeyBtn.disabled = false;
-      } else {
-        indicator.textContent = '❌ Formato de API key no válido';
-        indicator.style.color = 'red';
-        saveNewApiKeyBtn.disabled = true;
-      }
-    });
-    
-    // Guardar nueva API key
-    saveNewApiKeyBtn.addEventListener('click', function() {
-      const newApiKey = newApiKeyInput.value.trim();
-      
-      if (isValidApiKey(newApiKey)) {
-        chrome.storage.local.set({ apiKey: newApiKey }, function() {
-          showStatus('API key actualizada correctamente', 'success');
-          dialog.style.display = 'none';
-          downloadsSection.style.display = 'block';
-          
-          // Actualizar la visualización de la API key
-          updateApiKeyDisplay();
-          
-          // Verificar conexión con la nueva API key
-          checkServerConnection();
-        });
-      } else {
-        showStatus('Formato de API key no válido', 'error');
-      }
-    });
-    
-    // Cancelar cambio
-    cancelApiKeyChangeBtn.addEventListener('click', function() {
-      dialog.style.display = 'none';
-      downloadsSection.style.display = 'block';
-    });
+    console.log('✅ Diálogo de cambio de API Key creado y añadido al DOM');
   } else {
+    console.log('🔄 Reutilizando diálogo existente para cambio de API Key');
     // Reset del campo si el diálogo ya existe
-    document.getElementById('newApiKey').value = '';
-    document.getElementById('newApiKeyValidIndicator').textContent = '';
+    const newApiKeyInput = document.getElementById('newApiKey');
+    if (newApiKeyInput) {
+      newApiKeyInput.value = '';
+    }
+    const indicator = document.getElementById('newApiKeyValidIndicator');
+    if (indicator) {
+      indicator.textContent = '';
+    }
   }
   
   // Mostrar el diálogo
   dialog.style.display = 'block';
+  console.log('🔍 Diálogo de cambio de API Key mostrado');
+  
+  // Configurar eventos (asegurarnos de añadirlos cada vez)
+  const newApiKeyInput = document.getElementById('newApiKey');
+  const saveNewApiKeyBtn = document.getElementById('saveNewApiKeyBtn');
+  const cancelApiKeyChangeBtn = document.getElementById('cancelApiKeyChangeBtn');
+  
+  // Verificar que se encontraron todos los elementos
+  if (!newApiKeyInput || !saveNewApiKeyBtn || !cancelApiKeyChangeBtn) {
+    console.error('❌ No se encontraron todos los elementos del diálogo');
+    return;
+  }
+  
+  // Remover eventos anteriores (evitar duplicación)
+  newApiKeyInput.removeEventListener('input', validateNewApiKey);
+  saveNewApiKeyBtn.removeEventListener('click', saveNewApiKey);
+  cancelApiKeyChangeBtn.removeEventListener('click', cancelApiKeyChange);
+  
+  // Función para validar la API key
+  function validateNewApiKey() {
+    const currentValue = newApiKeyInput.value.trim();
+    
+    // Actualizar indicador de validez
+    const indicator = document.getElementById('newApiKeyValidIndicator');
+    if (isValidApiKey(currentValue)) {
+      // Determinar si es de prueba o real
+      const testApiKeys = ['test-api-key', 'dev-key', 'extension-key'];
+      const isTestKey = testApiKeys.includes(currentValue);
+      
+      indicator.textContent = isTestKey 
+        ? '✅ API key de prueba válida' 
+        : '✅ Formato de API key válido';
+      indicator.style.color = 'green';
+      saveNewApiKeyBtn.disabled = false;
+    } else {
+      indicator.textContent = '❌ Formato de API key no válido';
+      indicator.style.color = 'red';
+      saveNewApiKeyBtn.disabled = true;
+    }
+  }
+  
+  // Función para guardar la nueva API key
+  function saveNewApiKey() {
+    const newApiKey = newApiKeyInput.value.trim();
+    
+    if (isValidApiKey(newApiKey)) {
+      chrome.storage.local.set({ apiKey: newApiKey }, function() {
+        showStatus('API key actualizada correctamente', 'success');
+        dialog.style.display = 'none';
+        downloadsSection.style.display = 'block';
+        
+        // Actualizar la visualización de la API key
+        updateApiKeyDisplay();
+        
+        // Verificar conexión con la nueva API key
+        checkServerConnection();
+      });
+    } else {
+      showStatus('Formato de API key no válido', 'error');
+    }
+  }
+  
+  // Función para cancelar el cambio
+  function cancelApiKeyChange() {
+    dialog.style.display = 'none';
+    downloadsSection.style.display = 'block';
+    console.log('🔍 Diálogo de cambio de API Key cerrado (cancelado)');
+  }
+  
+  // Añadir eventos
+  newApiKeyInput.addEventListener('input', validateNewApiKey);
+  saveNewApiKeyBtn.addEventListener('click', saveNewApiKey);
+  cancelApiKeyChangeBtn.addEventListener('click', cancelApiKeyChange);
+  
+  console.log('✅ Eventos configurados para el diálogo de cambio de API Key');
 }
 
 // Función para añadir los estilos CSS necesarios
