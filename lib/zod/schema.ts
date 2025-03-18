@@ -169,12 +169,17 @@ export const deleteSoftwareSchema = z.object({
 export const createSoftwareSchema = z.object({
   id: z.string(),
   teamId: z.string().min(1, 'El ID del equipo es obligatorio'),
+  userId: z.string().min(1, 'El ID del usuario es obligatorio'),
   softwareName: z.string().min(1, 'El nombre del software es obligatorio'),
-  windowsEXE: z.string().nullable(),
-  macosEXE: z.string().nullable(),
-  version: z.string().min(1, 'La versión del software es obligatoria'),
-  answers: z.record(z.string()).default({}),
-  approved: z.boolean().default(false)
+  status: z.string().default('pending'),
+  launcher: z.string().nullable().optional(),
+  version: z.string().nullable().optional(),
+  fileSize: z.number().nullable().optional(),
+  downloadSource: z.string().nullable().optional(),
+  sha256: z.string().nullable().optional(),
+  md5: z.string().nullable().optional(),
+  requestedBy: z.string().nullable().optional(),
+  answers: z.record(z.string()).default({})
 });
 
 export const createSoftwareRequestSchema = z.object({

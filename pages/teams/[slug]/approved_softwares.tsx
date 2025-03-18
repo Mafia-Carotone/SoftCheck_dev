@@ -7,7 +7,7 @@ import { useTranslation } from 'next-i18next';
 import { Button, Modal, Form, Input, Checkbox } from 'react-daisyui';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/router';
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Table } from '@/components/shared/table/Table';
 import ConfirmationDialog from '../../../components/shared/ConfirmationDialog';
 import { GetServerSidePropsContext } from 'next';
@@ -15,6 +15,19 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import * as XLSX from 'xlsx';
 import * as Yup from 'yup';
 import { Formik } from 'formik';
+
+// Extender el tipo Software para incluir todas las propiedades necesarias
+interface ExtendedSoftware extends Software {
+  status: string;
+  launcher?: string | null;
+  fileSize?: number | null;
+  downloadSource?: string | null;
+  sha256?: string | null;
+  md5?: string | null;
+  requestedBy?: string | null;
+  createdAt: Date;
+  denniedDate?: Date | null;
+}
 
 const SoftwareTable = () => {
   const router = useRouter();
@@ -24,30 +37,15 @@ const SoftwareTable = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [confirmationDialogVisible, setConfirmationDialogVisible] = useState(false);
-  const [selectedSoftware, setSelectedSoftware] = useState<Software | null>(null);
+  const [selectedSoftware, setSelectedSoftware] = useState<ExtendedSoftware | null>(null);
   const [addSoftwareModalVisible, setAddSoftwareModalVisible] = useState(false);
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
 
   const { isLoading, isError, softwareList, mutateSoftwareList } = useSoftwareList();
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
-  if (isError) {
-    return <Error message={isError.message} />;
-  }
-
-  if (!softwareList) {
-    return null;
-  }
-
-  // Filtrar la lista para obtener software pendiente y aprobado
-  const pendingSoftware = softwareList.filter(software => !software.approved);
-  const approvedSoftware = softwareList.filter(software => software.approved);
-
-  const removeSoftware = async (software: Software | null) => {
+  // Mover las funciones que interactúan con la API y usan hooks a useCallback
+  const removeSoftware = useCallback(async (software: ExtendedSoftware | null) => {
     if (!software) return;
 
     const teamSlug = router.query.slug as string;
@@ -76,9 +74,9 @@ const SoftwareTable = () => {
       console.error('Error deleting software:', error);
       toast.error(error.message || 'Error al eliminar el software');
     }
-  };
+  }, [router.query.slug, mutateSoftwareList, t]);
 
-  const addSoftware = async (values: any) => {
+  const addSoftware = useCallback(async (values: any) => {
     const teamSlug = router.query.slug as string;
     try {
       // Generar un ID único
@@ -107,9 +105,9 @@ const SoftwareTable = () => {
       console.error('Error adding software:', error);
       toast.error(error.message || 'Error al añadir el software');
     }
-  };
+  }, [router.query.slug, mutateSoftwareList, t]);
 
-  const approveSoftware = async (software: Software) => {
+  const approveSoftware = useCallback(async (software: ExtendedSoftware) => {
     const teamSlug = router.query.slug as string;
     try {
       const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
@@ -119,7 +117,7 @@ const SoftwareTable = () => {
         },
         body: JSON.stringify({
           id: software.id,
-          approved: true
+          status: 'approved'
         })
       });
 
@@ -134,29 +132,64 @@ const SoftwareTable = () => {
       console.error('Error approving software:', error);
       toast.error(error.message || 'Error al aprobar el software');
     }
-  };
+  }, [router.query.slug, mutateSoftwareList, t]);
 
-  const downloadExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(softwareList.map(software => ({
+  const denySoftware = useCallback(async (software: ExtendedSoftware) => {
+    const teamSlug = router.query.slug as string;
+    try {
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: software.id,
+          status: 'rejected'
+        })
+      });
+
+      if (!response.ok) {
+        const json = await response.json();
+        throw Error(json.error?.message || 'Error al rechazar el software');
+      }
+
+      mutateSoftwareList();
+      toast.success(t('software-rejected'));
+    } catch (error: any) {
+      console.error('Error rejecting software:', error);
+      toast.error(error.message || 'Error al rechazar el software');
+    }
+  }, [router.query.slug, mutateSoftwareList, t]);
+
+  const downloadExcel = useCallback(() => {
+    if (!softwareList) return;
+    
+    const worksheet = XLSX.utils.json_to_sheet(softwareList.map((software: ExtendedSoftware) => ({
       Name: software.softwareName,
-      'Windows EXE': software.windowsEXE || '-',
-      'MacOS EXE': software.macosEXE || '-',
-      Version: software.version,
-      Approved: software.approved ? t('yes') : t('no'),
-      'Approval Date': new Date(software.approvalDate).toLocaleDateString(),
+      Status: software.status,
+      Launcher: software.launcher || '-',
+      Version: software.version || '-',
+      'File Size': software.fileSize ? `${(software.fileSize / (1024 * 1024)).toFixed(2)} MB` : '-',
+      'Download Source': software.downloadSource || '-',
+      SHA256: software.sha256 || '-',
+      MD5: software.md5 || '-',
+      'Requested By': software.requestedBy || '-',
+      'Created At': new Date(software.createdAt).toLocaleDateString(),
+      'Approval Date': software.approvalDate ? new Date(software.approvalDate).toLocaleDateString() : '-',
+      'Denied Date': software.denniedDate ? new Date(software.denniedDate).toLocaleDateString() : '-',
     })));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Approved Software');
-    XLSX.writeFile(workbook, 'approved_software.xlsx');
-  };
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Software Database');
+    XLSX.writeFile(workbook, 'software_database.xlsx');
+  }, [softwareList]);
 
-  const handleUploadClick = () => {
+  const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !softwareList) return;
 
     try {
       setIsProcessingExcel(true);
@@ -211,11 +244,11 @@ const SoftwareTable = () => {
         
         // Crear un mapa de software aprobado para búsqueda rápida
         const approvedSoftwareMap = new Map();
-        softwareList.forEach(software => {
-          approvedSoftwareMap.set(software.softwareName.toLowerCase(), software.approved);
+        softwareList.forEach((software: ExtendedSoftware) => {
+          approvedSoftwareMap.set(software.softwareName.toLowerCase(), software.status === 'approved');
         });
         
-        // Agregar la columna "Approved"
+        // Agregar la columna "Status"
         const processedData = excelData.map((row: any) => {
           const softwareName = row[processNameKey as string];
           const isApproved = softwareName && 
@@ -224,7 +257,7 @@ const SoftwareTable = () => {
           
           return {
             ...row,
-            'Approved': isApproved ? t('yes') : t('no')
+            'Status': isApproved ? 'approved' : 'pending'
           };
         });
         
@@ -249,18 +282,36 @@ const SoftwareTable = () => {
     
     // Limpiar el input para permitir subir el mismo archivo nuevamente
     event.target.value = '';
-  };
+  }, [softwareList, t]);
+
+  // Ahora, comprobemos si los datos están todavía cargando
+  if (isLoading) {
+    return <Loading />;
+  }
+
+  if (isError) {
+    return <Error message={isError.message} />;
+  }
+
+  if (!softwareList) {
+    return null;
+  }
+
+  // Filtrar la lista para obtener software pendiente y aprobado
+  const pendingSoftware = softwareList.filter((software: ExtendedSoftware) => software.status === 'pending');
+  const approvedSoftware = softwareList.filter((software: ExtendedSoftware) => software.status === 'approved');
 
   const cols = [
     t('name'),
-    t('windows-exe'),
-    t('macos-exe'),
     t('version'),
-    t('approval-date'),
+    t('launcher'),
+    t('download-source'),
+    t('file-size'),
+    t('date'),
   ];
 
   const pendingCols = [...cols];
-  const approvedCols = [...cols, t('approved')];
+  const approvedCols = [...cols, t('status')];
 
   if (canAccess('team_software', ['delete'])) {
     pendingCols.push(t('actions'));
@@ -270,17 +321,21 @@ const SoftwareTable = () => {
   // Validation schema for the form
   const SoftwareSchema = Yup.object().shape({
     softwareName: Yup.string().required(t('name-required')),
-    windowsEXE: Yup.string(),
-    macosEXE: Yup.string(),
-    version: Yup.string().required(t('version-required')),
-    approved: Yup.boolean(),
+    launcher: Yup.string(),
+    version: Yup.string(),
+    fileSize: Yup.number().nullable(),
+    downloadSource: Yup.string(),
+    sha256: Yup.string(),
+    md5: Yup.string(),
+    requestedBy: Yup.string(),
+    status: Yup.string().default('pending'),
   });
 
   return (
     <div className="space-y-8">
       {/* Tabs para navegación entre Pending y Approved */}
       <div className="flex border-b">
-      <button 
+        <button 
           className={`py-2 px-4 font-medium ${activeTab === 'approved' 
             ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
             : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}
@@ -296,10 +351,9 @@ const SoftwareTable = () => {
         >
           {t('Pending Software')}
         </button>
-
       </div>
 
-      {/* Sección de Software Database (original) */}
+      {/* Sección de Software Database (aprobado) */}
       {activeTab === 'approved' && (
         <div className="space-y-3">
           <div className="flex justify-between items-center">
@@ -342,11 +396,12 @@ const SoftwareTable = () => {
               id: software.id,
               cells: [
                 { text: software.softwareName, wrap: true },
-                { text: software.windowsEXE || '-', wrap: true },
-                { text: software.macosEXE || '-', wrap: true },
-                { text: software.version, wrap: true },
-                { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
-                { text: software.approved ? t('yes') : t('no'), wrap: true },
+                { text: software.version || '-', wrap: true },
+                { text: software.launcher || '-', wrap: true },
+                { text: software.downloadSource || '-', wrap: true },
+                { text: software.fileSize ? `${(software.fileSize / (1024 * 1024)).toFixed(2)} MB` : '-', wrap: true },
+                { text: new Date(software.createdAt).toLocaleDateString(), wrap: true },
+                { text: software.status, wrap: true },
                 ...(canAccess('team_software', ['delete'])
                   ? [{
                       buttons: [
@@ -372,7 +427,6 @@ const SoftwareTable = () => {
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-medium leading-none tracking-tight">{t('Pending Software')}</h2>
             <div className="flex space-x-2">
-     
             </div>
           </div>
           
@@ -387,10 +441,11 @@ const SoftwareTable = () => {
                 id: software.id,
                 cells: [
                   { text: software.softwareName, wrap: true },
-                  { text: software.windowsEXE || '-', wrap: true },
-                  { text: software.macosEXE || '-', wrap: true },
-                  { text: software.version, wrap: true },
-                  { text: new Date(software.approvalDate).toLocaleDateString(), wrap: true },
+                  { text: software.version || '-', wrap: true },
+                  { text: software.launcher || '-', wrap: true },
+                  { text: software.downloadSource || '-', wrap: true },
+                  { text: software.fileSize ? `${(software.fileSize / (1024 * 1024)).toFixed(2)} MB` : '-', wrap: true },
+                  { text: new Date(software.createdAt).toLocaleDateString(), wrap: true },
                   ...(canAccess('team_software', ['delete'])
                     ? [{
                         buttons: [
@@ -398,6 +453,11 @@ const SoftwareTable = () => {
                             color: 'success',
                             text: t('approve'),
                             onClick: () => approveSoftware(software),
+                          },
+                          {
+                            color: 'warning',
+                            text: t('deny'),
+                            onClick: () => denySoftware(software),
                           },
                           {
                             color: 'error',
@@ -444,10 +504,14 @@ const SoftwareTable = () => {
         <Formik
           initialValues={{
             softwareName: '',
-            windowsEXE: '',
-            macosEXE: '',
+            launcher: '',
             version: '',
-            approved: false,
+            fileSize: null,
+            downloadSource: '',
+            sha256: '',
+            md5: '',
+            requestedBy: '',
+            status: 'pending',
           }}
           validationSchema={SoftwareSchema}
           onSubmit={addSoftware}
@@ -460,6 +524,7 @@ const SoftwareTable = () => {
             handleBlur,
             handleSubmit,
             isSubmitting,
+            setFieldValue
           }) => (
             <form onSubmit={handleSubmit}>
               <Modal.Body>
@@ -487,29 +552,15 @@ const SoftwareTable = () => {
 
                   <div className="form-control w-full">
                     <label className="label">
-                      <span className="label-text">{t('windows-exe')}</span>
+                      <span className="label-text">{t('launcher')}</span>
                     </label>
                     <input
                       type="text"
-                      name="windowsEXE"
+                      name="launcher"
                       className="input input-bordered w-full"
                       onChange={handleChange}
                       onBlur={handleBlur}
-                      value={values.windowsEXE}
-                    />
-                  </div>
-
-                  <div className="form-control w-full">
-                    <label className="label">
-                      <span className="label-text">{t('macos-exe')}</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="macosEXE"
-                      className="input input-bordered w-full"
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      value={values.macosEXE}
+                      value={values.launcher}
                     />
                   </div>
 
@@ -520,18 +571,86 @@ const SoftwareTable = () => {
                     <input
                       type="text"
                       name="version"
-                      className={`input input-bordered w-full ${
-                        errors.version && touched.version ? 'input-error' : ''
-                      }`}
+                      className="input input-bordered w-full"
                       onChange={handleChange}
                       onBlur={handleBlur}
                       value={values.version}
                     />
-                    {errors.version && touched.version && (
-                      <label className="label">
-                        <span className="label-text-alt text-error">{errors.version}</span>
-                      </label>
-                    )}
+                  </div>
+
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">{t('file-size')} (MB)</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="fileSize"
+                      className="input input-bordered w-full"
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Convertir MB a bytes para almacenar
+                        const bytes = value ? parseInt(value) * 1024 * 1024 : null;
+                        setFieldValue('fileSize', bytes);
+                      }}
+                      onBlur={handleBlur}
+                      value={values.fileSize ? (values.fileSize / (1024 * 1024)) : ''}
+                    />
+                  </div>
+
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">{t('download-source')}</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="downloadSource"
+                      className="input input-bordered w-full"
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      value={values.downloadSource}
+                    />
+                  </div>
+
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">SHA256</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="sha256"
+                      className="input input-bordered w-full"
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      value={values.sha256}
+                    />
+                  </div>
+
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">MD5</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="md5"
+                      className="input input-bordered w-full"
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      value={values.md5}
+                    />
+                  </div>
+
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">{t('requested-by')}</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="requestedBy"
+                      className="input input-bordered w-full"
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      value={values.requestedBy}
+                    />
                   </div>
 
                   <div className="form-control">
@@ -539,10 +658,12 @@ const SoftwareTable = () => {
                       <span className="label-text">{t('approved')}</span>
                       <input
                         type="checkbox"
-                        name="approved"
+                        name="status"
                         className="toggle toggle-primary"
-                        onChange={handleChange}
-                        checked={values.approved}
+                        onChange={(e) => {
+                          setFieldValue('status', e.target.checked ? 'approved' : 'pending');
+                        }}
+                        checked={values.status === 'approved'}
                       />
                     </label>
                   </div>

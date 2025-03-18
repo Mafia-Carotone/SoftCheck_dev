@@ -1,25 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Software } from '@prisma/client';
 import { createSoftware } from 'models/software'; // Importar la función existente
 
-// Tipo para las solicitudes de software
-type SoftwareRequest = {
-  id?: string;
-  fileName: string;
-  fileSize: number;
-  fileUrl: string;
-  downloadSource: string;
-  status: string;
-  notes?: string;
-  teamId?: string;
-  createdAt?: string;
-};
-
-// Base de datos simple en memoria para almacenar solicitudes
-// En una implementación real, esto se conectaría a una base de datos
-const softwareRequests: SoftwareRequest[] = [];
+// Base de datos simple en memoria para almacenar solicitudes (para compatibilidad)
+// En una implementación real, esto sería eliminado y todo se guardaría en la BD
+const softwareRequests: Array<any> = [];
 
 // Inicializamos el cliente Prisma para acceder a la base de datos
 const prisma = new PrismaClient();
@@ -227,22 +214,6 @@ async function handleCreateRequest(
     
     console.log(`Procesando solicitud para software: "${softwareName}" versión "${version}"`);
     
-    // Para almacenar en la memoria temporal también (compatibilidad con el código existente)
-    const newRequest: SoftwareRequest = {
-      id: uuidv4(), // Generar un ID único
-      fileName,
-      fileSize: fileSize || 0,
-      fileUrl: fileUrl || '',
-      downloadSource: downloadSource || 'Extension',
-      status: status || 'pending',
-      notes: notes || '',
-      teamId: effectiveTeamId,
-      createdAt: new Date().toISOString()
-    };
-    
-    // Guardar en memoria temporal (mantener compatibilidad)
-    softwareRequests.push(newRequest);
-    
     // Intentar obtener el userId del usuario asociado al equipo
     // Para una solicitud de la extensión sin usuario específico, usaremos el primer usuario admin o owner
     let userId = 'system'; // Valor por defecto si no encontramos un usuario
@@ -269,90 +240,90 @@ async function handleCreateRequest(
       // Continuamos con el valor predeterminado
     }
     
-    // 1. Guardar la solicitud en la base de datos (SoftwareRequest)
-    const softwareRequest = await prisma.softwareRequest.create({
-      data: {
+    // Calcular hashes para campos sha256 y md5 si tenemos la información necesaria
+    let sha256Hash = null;
+    let md5Hash = null;
+    
+    // Esto es un placeholder - en una implementación real se calcularían los hashes del archivo
+    // Los hashes deberían ser proporcionados por la extensión o calculados de alguna manera
+    
+    // Estado de la solicitud - podemos controlar si aprobamos automáticamente o no
+    const autoApprove = false; // Por defecto, las solicitudes están pendientes
+    const statusToUse = autoApprove ? 'approved' : 'pending';
+    
+    try {
+      // Preparar los datos del software
+      const softwareData = {
+        id: uuidv4(), // Generar un ID único para el software
+        teamId: effectiveTeamId,
+        userId: userId,
+        softwareName, // Nombre extraído o del campo downloadSource
+        status: statusToUse,
+        launcher: null, // Campo nuevo
+        version, // Versión extraída o por defecto
+        fileSize: fileSize || null,
+        downloadSource: downloadSource || 'Extension',
+        sha256: sha256Hash,
+        md5: md5Hash,
+        requestedBy: fileName, // Usando el nombre del archivo como solicitante
+        // El campo answers debe ser un Record<string, string>
+        answers: {
+          source: 'extension',
+          automaticallyApproved: autoApprove ? 'true' : 'false',
+          fileName: fileName,
+          fileSize: String(fileSize || 0),
+          downloadSource: downloadSource || 'Extension',
+          originalFileName: fileName,
+          notes: notes || ''
+        }
+      };
+      
+      console.log('Creando solicitud de software con datos:', softwareData);
+      
+      // Crear el software directamente (con estado pendiente o aprobado según autoApprove)
+      const savedSoftware = await createSoftware(softwareData);
+      
+      console.log('Solicitud de software creada exitosamente:', savedSoftware);
+      
+      // Para compatibilidad, añadimos también a la lista en memoria
+      softwareRequests.push({
+        id: savedSoftware.id,
         fileName,
         fileSize: fileSize || 0,
         fileUrl: fileUrl || '',
         downloadSource: downloadSource || 'Extension',
-        status: status || 'pending',
+        status: statusToUse,
         notes: notes || '',
         teamId: effectiveTeamId,
-        userId: userId
-      }
-    });
-    
-    // 2. También guardar en la tabla de Software si está aprobado automáticamente
-    // Para extensión podemos aprobar automáticamente o dejarlo en pendiente según la configuración
-    const autoApprove = true; // Cambiado a true para aprobar automáticamente
-    let savedSoftware = null;
-    
-    if (autoApprove) {
-      // Determinar en qué campo guardar la ruta del ejecutable basado en la extensión del archivo
-      const isWindowsExe = fileName.toLowerCase().endsWith('.exe') || 
-                          fileName.toLowerCase().endsWith('.msi');
-      const isMacApp = fileName.toLowerCase().endsWith('.app') || 
-                       fileName.toLowerCase().endsWith('.dmg') ||
-                       fileName.toLowerCase().endsWith('.pkg');
+        createdAt: savedSoftware.createdAt.toISOString()
+      });
       
-      try {
-        // Preparar los datos del software según el formato esperado por createSoftware
-        const softwareData = {
-          id: uuidv4(), // Generar un ID único para el software
-          teamId: effectiveTeamId,
-          softwareName, // Ahora es el valor del campo downloadSource
-          version,
-          windowsEXE: isWindowsExe ? fileUrl : undefined,
-          macosEXE: isMacApp ? fileUrl : undefined,
-          approved: true,
-          // El campo answers debe ser un Record<string, string>
-          answers: {
-            source: 'extension',
-            automaticallyApproved: 'true', // Convertido a string
-            requestId: softwareRequest.id,
-            fileName: fileName,
-            fileSize: String(fileSize || 0),
-            downloadSource: downloadSource || 'Extension',
-            originalFileName: fileName // Guardar el nombre original por si acaso
-          }
-        };
-        
-        console.log('Creando software con datos:', softwareData);
-        
-        // Llamar a la función createSoftware correctamente
-        const result = await createSoftware(softwareData);
-        savedSoftware = result;
-        
-        console.log('Software creado exitosamente:', savedSoftware);
-        
-        // Actualizar la solicitud para marcarla como aprobada
-        await prisma.softwareRequest.update({
-          where: { id: softwareRequest.id },
-          data: {
-            status: 'approved',
-            processedAt: new Date()
-          }
-        });
-      } catch (error) {
-        console.error('Error al crear software:', error);
-        // Seguimos adelante con la solicitud aunque falle la creación del software
-      }
+      console.log(`Nueva solicitud creada: ${savedSoftware.id} para el equipo: ${effectiveTeamId}`);
+      
+      // Responder con éxito y los datos de la solicitud
+      return res.status(200).json({
+        success: true,
+        id: savedSoftware.id,
+        fileName,
+        fileSize: fileSize || 0,
+        fileUrl: fileUrl || '',
+        downloadSource: downloadSource || 'Extension',
+        status: statusToUse,
+        notes: notes || '',
+        teamId: effectiveTeamId,
+        createdAt: savedSoftware.createdAt,
+        software: savedSoftware
+      });
+    } catch (error: any) {
+      console.error('Error al crear solicitud de software:', error);
+      return res.status(500).json({
+        error: {
+          message: error.message || 'Error interno al procesar la solicitud'
+        }
+      });
     }
-    
-    console.log(`Nueva solicitud creada: ${softwareRequest.id} para el equipo: ${effectiveTeamId}`);
-    if (savedSoftware) {
-      console.log(`Software automáticamente aprobado: ${savedSoftware.id}`);
-    }
-    
-    // Responder con éxito y los datos de la solicitud
-    return res.status(200).json({
-      ...softwareRequest,
-      autoApproved: autoApprove,
-      software: savedSoftware
-    });
   } catch (error) {
-    console.error('Error al crear solicitud:', error);
+    console.error('Error general al procesar solicitud:', error);
     return res.status(500).json({
       error: {
         message: 'Error interno al procesar la solicitud'
@@ -373,10 +344,11 @@ async function handleGetRequests(
     // Obtener el ID del equipo basado en la API key
     const teamId = await getTeamIdFromApiKey(apiKey);
     
-    // Obtener solicitudes de la base de datos
-    const requests = await prisma.softwareRequest.findMany({
+    // Obtener solicitudes directamente de la tabla Software con status=pending
+    const requests = await prisma.software.findMany({
       where: {
-        teamId: teamId
+        teamId: teamId,
+        status: 'pending'
       },
       orderBy: {
         createdAt: 'desc'
@@ -418,29 +390,37 @@ async function handleDeleteRequest(
     // Obtener el ID del equipo basado en la API key
     const teamId = await getTeamIdFromApiKey(apiKey);
     
-    // Buscar y eliminar la solicitud en la base de datos
+    // Buscar y eliminar el software en la base de datos
     try {
-      const deletedRequest = await prisma.softwareRequest.deleteMany({
+      // Primero verificamos que el software exista y pertenezca al equipo
+      const software = await prisma.software.findFirst({
         where: {
           id: id,
           teamId: teamId
         }
       });
       
-      if (deletedRequest.count === 0) {
+      if (!software) {
         return res.status(404).json({
           error: {
-            message: 'Solicitud no encontrada o no autorizada'
+            message: 'Software no encontrado o no autorizado'
           }
         });
       }
       
-      console.log(`Solicitud eliminada: ${id}`);
+      // Eliminamos el software
+      await prisma.software.delete({
+        where: {
+          id: id
+        }
+      });
+      
+      console.log(`Software eliminado: ${id}`);
       
       // Responder con éxito
-      return res.status(200).json({ success: true, message: 'Solicitud eliminada correctamente' });
+      return res.status(200).json({ success: true, message: 'Software eliminado correctamente' });
     } catch (error) {
-      console.error('Error al eliminar solicitud en BD:', error);
+      console.error('Error al eliminar software en BD:', error);
       
       // Si falla la eliminación en BD, intentar en el array temporal como fallback
       const requestIndex = softwareRequests.findIndex(
@@ -450,7 +430,7 @@ async function handleDeleteRequest(
       if (requestIndex === -1) {
         return res.status(404).json({
           error: {
-            message: 'Solicitud no encontrada o no autorizada'
+            message: 'Software no encontrado o no autorizado'
           }
         });
       }
@@ -458,15 +438,15 @@ async function handleDeleteRequest(
       // Eliminar la solicitud del array
       softwareRequests.splice(requestIndex, 1);
       
-      console.log(`Solicitud eliminada de memoria temporal: ${id}`);
+      console.log(`Software eliminado de memoria temporal: ${id}`);
       
-      return res.status(200).json({ success: true, message: 'Solicitud eliminada correctamente' });
+      return res.status(200).json({ success: true, message: 'Software eliminado correctamente' });
     }
   } catch (error) {
-    console.error('Error al eliminar solicitud:', error);
+    console.error('Error al eliminar software:', error);
     return res.status(500).json({
       error: {
-        message: 'Error interno al eliminar la solicitud'
+        message: 'Error interno al eliminar el software'
       }
     });
   }

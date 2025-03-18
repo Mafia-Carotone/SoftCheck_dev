@@ -15,26 +15,38 @@ enum Role {
 }
 
 model Software {
-  id               String    @id @default(uuid())
+  id                String    @id @default(uuid())
   teamId           String
-  userId           String
   softwareName     String
-  status           String    @default("pending") // pending, approved, rejected
-  launcher         String?
-  version          String?
-  fileSize         Int?
-  downloadSource   String?
-  sha256           String?
-  md5              String?
-  requestedBy      String?
-  createdAt        DateTime  @default(now())
-  approvalDate     DateTime?
-  denniedDate      DateTime?
+  windowsEXE       String?
+  macosEXE         String?
+  version          String
+  approvalDate     DateTime  @default(now())
   answers          Json?     @default("{}")
-  checkedBy        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approved         Boolean   @default(false)
   team             Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  @@unique([id])
+  @@unique([id, teamId])
+  @@index([teamId])
+}
+
+model SoftwareRequest {
+  id              String    @id @default(uuid())
+  teamId          String
+  userId          String
+  fileName        String
+  fileSize        Int?
+  fileUrl         String?
+  downloadSource  String?
+  status          String    @default("pending") // pending, approved, rejected
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  processedAt     DateTime?
+  notes           String?
+  
+  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@index([teamId])
   @@index([userId])
   @@index([status])
@@ -95,7 +107,6 @@ model User {
   accounts    Account[]
   sessions    Session[]
   invitations Invitation[]
-  software    Software[]
   softwareRequests SoftwareRequest[]
 }
 
@@ -214,27 +225,6 @@ model Price {
   created       DateTime
 
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-}
-
-model SoftwareRequest {
-  id             String    @id @default(uuid())
-  fileName       String
-  fileSize       Int       @default(0)
-  fileUrl        String?
-  downloadSource String?
-  status         String    @default("pending")
-  notes          String?
-  createdAt      DateTime  @default(now())
-  processedAt    DateTime?
-  teamId         String
-  userId         String
-  
-  team           Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([teamId])
-  @@index([userId])
-  @@index([status])
 }
 
 model jackson_store {

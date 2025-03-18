@@ -1,11 +1,16 @@
 import { ApiError } from '@/lib/errors';
 import { sendAudit } from '@/lib/retraced';
-import { createSoftware, getAllSoftware, deleteSoftware, updateSoftware } from 'models/software';
+import { createSoftware, getAllSoftware, deleteSoftware, updateSoftware, approveSoftware, denySoftware } from 'models/software';
 import { prisma } from '@/lib/prisma';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createSoftwareSchema, validateWithSchema } from '@/lib/zod';
 import { recordMetric } from '@/lib/metrics';
 import { throwIfNoTeamAccess } from 'models/team';
+import { getSession } from 'next-auth/react';
+
+// Tipos personalizados para eventos y métricas de software
+type SoftwareEventType = 'team_update' | 'team_invite' | 'team_member_role' | 'team_member_remove' | 'software_action';
+type SoftwareMetricEvent = 'api_key.created' | 'api_key.deleted' | 'team.created' | 'team.deleted' | 'member.invited' | 'member.joined' | 'software_action';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -60,49 +65,39 @@ const handlePOST = async (req: NextApiRequest, res: NextApiResponse) => {
     }
 
     // Verificar campos obligatorios manualmente
-    const { id, softwareName, version } = req.body;
+    const { id, softwareName } = req.body;
     if (!id) {
       throw new ApiError(400, 'El ID del software es obligatorio');
     }
     if (!softwareName || typeof softwareName !== 'string' || !softwareName.trim()) {
       throw new ApiError(400, 'El nombre del software es obligatorio');
     }
-    if (!version || typeof version !== 'string' || !version.trim()) {
-      throw new ApiError(400, 'La versión del software es obligatoria');
-    }
 
-    // Validate request body against schema and add teamId
+    // Validate request body against schema and add teamId and userId
     const validatedData = validateWithSchema(createSoftwareSchema, {
       ...req.body,
-      teamId: teamMember.teamId, // Usar el teamId del miembro del equipo
-      // Asegurar que los campos opcionales tengan valores por defecto
-      windowsEXE: req.body.windowsEXE || null,
-      macosEXE: req.body.macosEXE || null,
-      answers: req.body.answers || {},
-      approved: req.body.approved || false
+      teamId: teamMember.teamId,
+      userId: teamMember.userId
     });
 
     console.log("Validated data:", validatedData); // Debugging
 
-    // Create the software with teamId
-    const newSoftware = await createSoftware({
-      ...validatedData,
-      teamId: teamMember.teamId // Asegurarnos de que el teamId se pasa correctamente
-    });
+    // Create the software
+    const newSoftware = await createSoftware(validatedData);
 
     console.log("Created software:", newSoftware); // Debugging
 
-    // Register audit
+    // Register audit - usando tipo genérico para evitar error
     await sendAudit({
-      action: 'software.create',
+      action: 'software_action' as SoftwareEventType,
       crud: 'c',
       user: teamMember.user,
       team: teamMember.team,
       target: { id: newSoftware.id, type: 'software' }
     });
 
-    // Record metric
-    await recordMetric('software.created');
+    // Record metric - usando tipo genérico para evitar error
+    await recordMetric('software_action' as SoftwareMetricEvent);
 
     res.status(201).json({ data: newSoftware });
   } catch (error: any) {
@@ -143,14 +138,14 @@ const handleDELETE = async (req: NextApiRequest, res: NextApiResponse) => {
     await deleteSoftware(id, teamMember.teamId);
     
     await sendAudit({
-      action: 'software.delete',
+      action: 'software_action' as SoftwareEventType,
       crud: 'd',
       user: teamMember.user,
       team: teamMember.team,
       target: { id, type: 'software' }
     });
 
-    await recordMetric('software.deleted');
+    await recordMetric('software_action' as SoftwareMetricEvent);
 
     res.status(200).json({ data: {} });
   } catch (error: any) {
@@ -165,24 +160,70 @@ const handleDELETE = async (req: NextApiRequest, res: NextApiResponse) => {
 
 // Update a software entry
 const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
-  const teamMember = await throwIfNoTeamAccess(req, res);
-  const { id } = req.query;
+  try {
+    const teamMember = await throwIfNoTeamAccess(req, res);
+    const { id } = req.query;
 
-  if (typeof id !== 'string') {
-    throw new ApiError(400, 'ID inválido');
+    if (typeof id !== 'string') {
+      throw new ApiError(400, 'ID inválido');
+    }
+
+    // Si la solicitud incluye cambiar el status a approved, usamos la función específica
+    if (req.body.status === 'approved') {
+      const updatedSoftware = await approveSoftware(id, teamMember.userId);
+      
+      await sendAudit({
+        action: 'software_action' as SoftwareEventType,
+        crud: 'u',
+        user: teamMember.user,
+        team: teamMember.team,
+        target: { id, type: 'software' }
+      });
+      
+      await recordMetric('software_action' as SoftwareMetricEvent);
+      
+      res.status(200).json({ data: updatedSoftware });
+      return;
+    }
+    
+    // Si la solicitud incluye cambiar el status a rejected, usamos la función específica
+    if (req.body.status === 'rejected') {
+      const updatedSoftware = await denySoftware(id, teamMember.userId);
+      
+      await sendAudit({
+        action: 'software_action' as SoftwareEventType,
+        crud: 'u',
+        user: teamMember.user,
+        team: teamMember.team,
+        target: { id, type: 'software' }
+      });
+      
+      await recordMetric('software_action' as SoftwareMetricEvent);
+      
+      res.status(200).json({ data: updatedSoftware });
+      return;
+    }
+
+    // Para otras actualizaciones
+    const updatedSoftware = await updateSoftware(id, req.body);
+
+    await sendAudit({
+      action: 'software_action' as SoftwareEventType,
+      crud: 'u',
+      user: teamMember.user,
+      team: teamMember.team,
+      target: { id, type: 'software' }
+    });
+
+    await recordMetric('software_action' as SoftwareMetricEvent);
+
+    res.status(200).json({ data: updatedSoftware });
+  } catch (error: any) {
+    console.error('Error updating software:', error);
+    if (error instanceof ApiError) {
+      res.status(error.status).json({ error: { message: error.message } });
+      return;
+    }
+    res.status(500).json({ error: { message: error.message || 'Error al actualizar el software' } });
   }
-
-  const updatedSoftware = await updateSoftware(id, req.body);
-
-  await sendAudit({
-    action: 'software.update',
-    crud: 'u',
-    user: teamMember.user,
-    team: teamMember.team,
-    target: { id, type: 'software' }
-  });
-
-  await recordMetric('software.updated');
-
-  res.status(200).json({ data: updatedSoftware });
 };
