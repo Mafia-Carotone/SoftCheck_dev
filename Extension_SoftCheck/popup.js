@@ -973,8 +973,38 @@ function cancelDownload(index) {
           if (!response.ok) {
             try {
               const errorData = JSON.parse(text);
+              // Si el error indica que el software no existe o no está autorizado,
+              // eliminamos la entrada localmente en vez de mostrar error
+              if (text.includes('no encontrado') || 
+                  text.includes('not found') || 
+                  text.includes('no autorizado') ||
+                  text.includes('unauthorized') || 
+                  response.status === 404) {
+                console.log('⚠️ Software no encontrado en la base de datos, eliminando entrada local');
+                // Eliminar la descarga del almacenamiento local
+                pendingDownloads.splice(index, 1);
+                chrome.storage.local.set({ pendingDownloads }, function() {
+                  showStatus('Solicitud eliminada localmente', 'success');
+                  loadPendingDownloads();
+                });
+                return; // Salimos para evitar el throw
+              }
               throw new Error(errorData.error?.message || `Error ${response.status}: ${response.statusText}`);
             } catch (e) {
+              if (e instanceof SyntaxError) {
+                // Error al parsear JSON - probablemente no es un error de formato JSON
+                // Si es un 404 o similar, también eliminar localmente
+                if (response.status === 404 || response.status === 403 || response.status === 401) {
+                  console.log('⚠️ Error de autorización o recurso no encontrado, eliminando entrada local');
+                  pendingDownloads.splice(index, 1);
+                  chrome.storage.local.set({ pendingDownloads }, function() {
+                    showStatus('Solicitud eliminada localmente', 'success');
+                    loadPendingDownloads();
+                  });
+                  return;
+                }
+              }
+              
               if (text.includes('<!DOCTYPE html>')) {
                 throw new Error(`Error ${response.status}: Endpoint no encontrado`);
               }
@@ -991,7 +1021,23 @@ function cancelDownload(index) {
         })
         .catch(error => {
           console.error('Error al cancelar solicitud:', error);
-          showStatus(`Error: ${error.message || 'Error al cancelar la solicitud'}`, 'error');
+          
+          // Si el mensaje de error indica que el software no existe o no autorizado,
+          // eliminamos la entrada localmente en vez de mostrar error
+          if (error.message.includes('no encontrado') || 
+              error.message.includes('not found') || 
+              error.message.includes('no autorizado') ||
+              error.message.includes('unauthorized')) {
+            console.log('⚠️ Software no encontrado o no autorizado, eliminando entrada local');
+            // Eliminar la descarga del almacenamiento local
+            pendingDownloads.splice(index, 1);
+            chrome.storage.local.set({ pendingDownloads }, function() {
+              showStatus('Solicitud eliminada localmente', 'success');
+              loadPendingDownloads();
+            });
+          } else {
+            showStatus(`Error: ${error.message || 'Error al cancelar la solicitud'}`, 'error');
+          }
         });
       });
     } else {
