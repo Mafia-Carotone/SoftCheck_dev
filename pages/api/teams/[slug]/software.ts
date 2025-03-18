@@ -162,7 +162,18 @@ const handleDELETE = async (req: NextApiRequest, res: NextApiResponse) => {
 const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
     const teamMember = await throwIfNoTeamAccess(req, res);
-    const { id } = req.query;
+    
+    // Intentar obtener el ID desde la query string o el body
+    let id = req.query.id as string;
+    if (!id && req.body.id) {
+      id = req.body.id as string;
+    }
+
+    console.log('PATCH - Datos recibidos:', { id, bodyId: req.body.id, status: req.body.status });
+
+    if (!id) {
+      throw new ApiError(400, 'Se requiere un ID de software para la actualización');
+    }
 
     if (typeof id !== 'string') {
       throw new ApiError(400, 'ID inválido');
@@ -170,6 +181,7 @@ const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
 
     // Si la solicitud incluye cambiar el status a approved, usamos la función específica
     if (req.body.status === 'approved') {
+      console.log(`Aprobando software con ID: ${id}`);
       const updatedSoftware = await approveSoftware(id, teamMember.userId);
       
       await sendAudit({
@@ -182,12 +194,14 @@ const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
       
       await recordMetric('software_action' as SoftwareMetricEvent);
       
+      console.log('Software aprobado exitosamente:', updatedSoftware);
       res.status(200).json({ data: updatedSoftware });
       return;
     }
     
     // Si la solicitud incluye cambiar el status a rejected, usamos la función específica
     if (req.body.status === 'rejected') {
+      console.log(`Rechazando software con ID: ${id}`);
       const updatedSoftware = await denySoftware(id, teamMember.userId);
       
       await sendAudit({
@@ -200,11 +214,13 @@ const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
       
       await recordMetric('software_action' as SoftwareMetricEvent);
       
+      console.log('Software rechazado exitosamente:', updatedSoftware);
       res.status(200).json({ data: updatedSoftware });
       return;
     }
 
     // Para otras actualizaciones
+    console.log(`Actualizando software con ID: ${id}, datos:`, req.body);
     const updatedSoftware = await updateSoftware(id, req.body);
 
     await sendAudit({
@@ -217,6 +233,7 @@ const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
 
     await recordMetric('software_action' as SoftwareMetricEvent);
 
+    console.log('Software actualizado exitosamente:', updatedSoftware);
     res.status(200).json({ data: updatedSoftware });
   } catch (error: any) {
     console.error('Error updating software:', error);

@@ -17,16 +17,24 @@ import * as Yup from 'yup';
 import { Formik } from 'formik';
 
 // Extender el tipo Software para incluir todas las propiedades necesarias
-interface ExtendedSoftware extends Software {
+// Este tipo ahora mapea exactamente a nuestro modelo Prisma actualizado
+interface ExtendedSoftware extends Omit<Software, 'status'> {
+  id: string; 
+  teamId: string;
+  userId: string;
+  softwareName: string;
   status: string;
   launcher?: string | null;
+  version?: string | null;
   fileSize?: number | null;
   downloadSource?: string | null;
   sha256?: string | null;
   md5?: string | null;
   requestedBy?: string | null;
   createdAt: Date;
+  approvalDate?: Date | null;
   denniedDate?: Date | null;
+  answers?: Record<string, any> | null;
 }
 
 const SoftwareTable = () => {
@@ -42,6 +50,7 @@ const SoftwareTable = () => {
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
 
+  // Tipado correcto para el software list
   const { isLoading, isError, softwareList, mutateSoftwareList } = useSoftwareList();
 
   // Mover las funciones que interactúan con la API y usan hooks a useCallback
@@ -50,7 +59,7 @@ const SoftwareTable = () => {
 
     const teamSlug = router.query.slug as string;
     try {
-      console.log('Attempting to delete software:', { id: software.id, teamSlug }); // Debugging
+      console.log('Eliminando software:', { id: software.id, teamSlug });
 
       const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
         method: 'DELETE',
@@ -59,8 +68,6 @@ const SoftwareTable = () => {
         },
         body: JSON.stringify({ id: software.id })
       });
-
-      console.log('Delete response:', response.status); // Debugging
 
       if (!response.ok) {
         const json = await response.json();
@@ -71,7 +78,7 @@ const SoftwareTable = () => {
       toast.success(t('software-deleted'));
       setConfirmationDialogVisible(false);
     } catch (error: any) {
-      console.error('Error deleting software:', error);
+      console.error('Error eliminando software:', error);
       toast.error(error.message || 'Error al eliminar el software');
     }
   }, [router.query.slug, mutateSoftwareList, t]);
@@ -81,6 +88,8 @@ const SoftwareTable = () => {
     try {
       // Generar un ID único
       const id = `SW-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('Añadiendo software:', { ...values, id });
       
       const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
         method: 'POST',
@@ -102,69 +111,83 @@ const SoftwareTable = () => {
       toast.success(t('software-added'));
       setAddSoftwareModalVisible(false);
     } catch (error: any) {
-      console.error('Error adding software:', error);
+      console.error('Error añadiendo software:', error);
       toast.error(error.message || 'Error al añadir el software');
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
+  // Función para aprobar software - ahora actualizada para depurar mejor
   const approveSoftware = useCallback(async (software: ExtendedSoftware) => {
     const teamSlug = router.query.slug as string;
     try {
-      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+      console.log('Aprobando software:', { id: software.id, teamSlug });
+      
+      toast.loading(t('approving-software'), { id: 'approve-toast' });
+      
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software?id=${software.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          id: software.id,
           status: 'approved'
         })
       });
 
+      const data = await response.json();
+      console.log('Respuesta de la API:', data);
+
       if (!response.ok) {
-        const json = await response.json();
-        throw Error(json.error?.message || 'Error al aprobar el software');
+        throw Error(data.error?.message || 'Error al aprobar el software');
       }
 
-      mutateSoftwareList();
-      toast.success(t('software-approved'));
+      await mutateSoftwareList();
+      toast.success(t('software-approved'), { id: 'approve-toast' });
     } catch (error: any) {
-      console.error('Error approving software:', error);
-      toast.error(error.message || 'Error al aprobar el software');
+      console.error('Error aprobando software:', error);
+      toast.error(error.message || 'Error al aprobar el software', { id: 'approve-toast' });
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
   const denySoftware = useCallback(async (software: ExtendedSoftware) => {
     const teamSlug = router.query.slug as string;
     try {
-      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software`, {
+      console.log('Rechazando software:', { id: software.id, teamSlug });
+      
+      toast.loading(t('denying-software'), { id: 'deny-toast' });
+      
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamSlug)}/software?id=${software.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          id: software.id,
           status: 'rejected'
         })
       });
 
+      const data = await response.json();
+      console.log('Respuesta de la API:', data);
+
       if (!response.ok) {
-        const json = await response.json();
-        throw Error(json.error?.message || 'Error al rechazar el software');
+        throw Error(data.error?.message || 'Error al rechazar el software');
       }
 
-      mutateSoftwareList();
-      toast.success(t('software-rejected'));
+      await mutateSoftwareList();
+      toast.success(t('software-rejected'), { id: 'deny-toast' });
     } catch (error: any) {
-      console.error('Error rejecting software:', error);
-      toast.error(error.message || 'Error al rechazar el software');
+      console.error('Error rechazando software:', error);
+      toast.error(error.message || 'Error al rechazar el software', { id: 'deny-toast' });
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
   const downloadExcel = useCallback(() => {
     if (!softwareList) return;
     
-    const worksheet = XLSX.utils.json_to_sheet(softwareList.map((software: ExtendedSoftware) => ({
+    // Convertimos los datos a ExtendedSoftware para typed safety
+    const typedSoftwareList = softwareList as unknown as ExtendedSoftware[];
+    
+    const worksheet = XLSX.utils.json_to_sheet(typedSoftwareList.map(software => ({
       Name: software.softwareName,
       Status: software.status,
       Launcher: software.launcher || '-',
@@ -297,9 +320,12 @@ const SoftwareTable = () => {
     return null;
   }
 
+  // Convertimos los datos a ExtendedSoftware para typed safety
+  const typedSoftwareList = softwareList as unknown as ExtendedSoftware[];
+  
   // Filtrar la lista para obtener software pendiente y aprobado
-  const pendingSoftware = softwareList.filter((software: ExtendedSoftware) => software.status === 'pending');
-  const approvedSoftware = softwareList.filter((software: ExtendedSoftware) => software.status === 'approved');
+  const pendingSoftware = typedSoftwareList.filter(software => software.status === 'pending');
+  const approvedSoftware = typedSoftwareList.filter(software => software.status === 'approved');
 
   const cols = [
     t('name'),
