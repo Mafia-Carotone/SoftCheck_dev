@@ -199,9 +199,9 @@ const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
       return;
     }
     
-    // Si la solicitud incluye cambiar el status a rejected, usamos la función específica
-    if (req.body.status === 'rejected') {
-      console.log(`Rechazando software con ID: ${id}`);
+    // Si la solicitud incluye cambiar el status a denied (antes era rejected), usamos la función específica
+    if (req.body.status === 'denied') {
+      console.log(`Denegando software con ID: ${id}`);
       const updatedSoftware = await denySoftware(id, teamMember.userId);
       
       await sendAudit({
@@ -214,7 +214,7 @@ const handlePATCH = async (req: NextApiRequest, res: NextApiResponse) => {
       
       await recordMetric('software_action' as SoftwareMetricEvent);
       
-      console.log('Software rechazado exitosamente:', updatedSoftware);
+      console.log('Software denegado exitosamente:', updatedSoftware);
       res.status(200).json({ data: updatedSoftware });
       return;
     }

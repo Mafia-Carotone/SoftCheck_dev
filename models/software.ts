@@ -167,7 +167,7 @@ export const denySoftware = async (id: string, userId: string): Promise<Software
   return await prisma.software.update({
     where: { id },
     data: {
-      status: 'rejected',
+      status: 'denied',
       denniedDate: new Date(),
       userId
     }

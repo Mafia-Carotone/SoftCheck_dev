@@ -149,10 +149,11 @@ const SoftwareTable = () => {
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
+  // Función para denegar software - ahora usa "denied" en lugar de "rejected"
   const denySoftware = useCallback(async (software: ExtendedSoftware) => {
     const teamSlug = router.query.slug as string;
     try {
-      console.log('Rechazando software:', { id: software.id, teamSlug });
+      console.log('Denegando software:', { id: software.id, teamSlug });
       
       toast.loading(t('denying-software'), { id: 'deny-toast' });
       
@@ -162,7 +163,7 @@ const SoftwareTable = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          status: 'rejected'
+          status: 'denied'
         })
       });
 
@@ -170,14 +171,14 @@ const SoftwareTable = () => {
       console.log('Respuesta de la API:', data);
 
       if (!response.ok) {
-        throw Error(data.error?.message || 'Error al rechazar el software');
+        throw Error(data.error?.message || 'Error al denegar el software');
       }
 
       await mutateSoftwareList();
-      toast.success(t('software-rejected'), { id: 'deny-toast' });
+      toast.success(t('software-denied'), { id: 'deny-toast' });
     } catch (error: any) {
-      console.error('Error rechazando software:', error);
-      toast.error(error.message || 'Error al rechazar el software', { id: 'deny-toast' });
+      console.error('Error denegando software:', error);
+      toast.error(error.message || 'Error al denegar el software', { id: 'deny-toast' });
     }
   }, [router.query.slug, mutateSoftwareList, t]);
 
@@ -323,9 +324,13 @@ const SoftwareTable = () => {
   // Convertimos los datos a ExtendedSoftware para typed safety
   const typedSoftwareList = softwareList as unknown as ExtendedSoftware[];
   
-  // Filtrar la lista para obtener software pendiente y aprobado
+  // Filtrar la lista para obtener software pendiente, aprobado y denegado
   const pendingSoftware = typedSoftwareList.filter(software => software.status === 'pending');
-  const approvedSoftware = typedSoftwareList.filter(software => software.status === 'approved');
+  
+  // El Software Database ahora incluye tanto software aprobado como denegado
+  const databaseSoftware = typedSoftwareList.filter(software => 
+    software.status === 'approved' || software.status === 'denied'
+  );
 
   const cols = [
     t('name'),
@@ -379,7 +384,7 @@ const SoftwareTable = () => {
         </button>
       </div>
 
-      {/* Sección de Software Database (aprobado) */}
+      {/* Sección de Software Database (software aprobado y denegado) */}
       {activeTab === 'approved' && (
         <div className="space-y-3">
           <div className="flex justify-between items-center">
@@ -418,7 +423,7 @@ const SoftwareTable = () => {
           
           <Table
             cols={approvedCols}
-            body={approvedSoftware.map((software) => ({
+            body={databaseSoftware.map((software) => ({
               id: software.id,
               cells: [
                 { text: software.softwareName, wrap: true },
@@ -427,7 +432,13 @@ const SoftwareTable = () => {
                 { text: software.downloadSource || '-', wrap: true },
                 { text: software.fileSize ? `${(software.fileSize / (1024 * 1024)).toFixed(2)} MB` : '-', wrap: true },
                 { text: new Date(software.createdAt).toLocaleDateString(), wrap: true },
-                { text: software.status, wrap: true },
+                { 
+                  text: software.status, 
+                  wrap: true,
+                  className: software.status === 'approved' 
+                    ? 'text-green-600 font-medium' 
+                    : 'text-red-600 font-medium'
+                },
                 ...(canAccess('team_software', ['delete'])
                   ? [{
                       buttons: [
