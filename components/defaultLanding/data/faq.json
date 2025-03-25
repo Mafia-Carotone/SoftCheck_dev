@@ -1,14 +1,14 @@
 [
   {
-    "question": "What Softcheck does exactly?",
+    "question": "What SoftCheck does exactly?",
     "answer": "It allows employees to request the software they want the company to approve. Additionally, it features a fully customizable algorithm that the company can use to approve or deny software requests. Finally, it removes any non-Approved software from employees' computers."
   },
   {
     "question": "Can we customize the approval criteria?",
-    "answer": "Yes, Softcheck allows your team customize the approval criteria."
+    "answer": "Yes, SoftCheck allows your team customize the approval criteria."
   },
   {
     "question": "How does the system handle software removal?",
-    "answer": "Softcheck can be connected to your EDR via API, or you can download all the installed software from your EDR and filter it in Softcheck."
+    "answer": "SoftCheck can be connected to your EDR via API, or you can download all the installed software from your EDR and filter it in SoftCheck."
   }
 ]
