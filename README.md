@@ -269,3 +269,71 @@ Made with [contrib.rocks](https://contrib.rocks).
 ## 🛡️ License
 
 [Apache 2.0 License](https://github.com/boxyhq/saas-starter-kit/blob/main/LICENSE)
+
+## Validación automática con IA
+
+SoftCheck ahora incluye la capacidad de validar el software automáticamente utilizando modelos de lenguaje natural. Esta funcionalidad te permite:
+
+1. Analizar automáticamente los riesgos de seguridad del software
+2. Obtener recomendaciones basadas en IA sobre la aprobación o rechazo
+3. Mantener un flujo de trabajo de aprobación asistido por inteligencia artificial
+
+### Configuración
+
+Para configurar la validación con IA:
+
+1. Obtén una API Key de [Hugging Face](https://huggingface.co)
+2. Crea o edita el archivo `.env.local` en la raíz del proyecto
+3. Añade las siguientes variables:
+
+```
+HUGGINGFACE_API_KEY=tu_api_key_aqui
+HUGGINGFACE_MODEL_ID=modelo_a_usar
+```
+
+Recomendamos usar modelos como `gpt2` para pruebas iniciales. Para producción, considera modelos más avanzados como `google/flan-t5-xxl` o `meta-llama/Llama-2-7b-chat-hf` (requieren permisos adicionales).
+
+### Uso
+
+1. En la vista de software pendiente de aprobación, verás un botón "AI Validate"
+2. Al hacer clic, el sistema enviará la información del software al modelo de IA
+3. El sistema analizará:
+   - Políticas de privacidad del software
+   - Certificaciones de seguridad
+   - Vulnerabilidades activas conocidas
+   - Reputación del desarrollador
+   - Frecuencia de actualizaciones
+   - Historial de vulnerabilidades
+   - Reportes de versiones maliciosas
+
+4. La IA aplicará los mismos criterios críticos de validación que el proceso manual:
+   - Rechazará automáticamente software sin política de privacidad clara
+   - Rechazará software con vulnerabilidades activas conocidas
+   - Rechazará software con reportes de versiones maliciosas
+
+5. Resultados del análisis:
+   - **Vista detallada**: La interfaz mostrará claramente el análisis del modelo con un resumen visual de los riesgos detectados
+   - **Respuesta por pregunta**: Cada pregunta de validación tendrá su respuesta con justificación
+   - **Recomendación final**: APROBAR o RECHAZAR junto con nivel de confianza
+   - **Acción manual o automática**: Si la confianza es alta (>80%), puedes aplicar la decisión automáticamente o editar manualmente
+
+6. Consulta histórica de análisis:
+   - En la tabla de Software Database, cada software validado por IA mostrará un botón "Ver análisis IA"
+   - Al hacer clic, podrás ver todo el análisis que llevó a la decisión de aprobación o rechazo
+   - Esto permite auditar y entender las decisiones tomadas por el sistema
+
+### Simulación sin API Key
+
+Para probar la funcionalidad sin una API Key de Hugging Face:
+
+1. Deja vacío el campo `HUGGINGFACE_API_KEY` en tu archivo `.env.local`
+2. El sistema generará respuestas simuladas:
+   - Para nombres de software que incluyan "riesgoso", "malware" o "vulnerable", mostrará un análisis que recomienda RECHAZAR
+   - Para otros nombres, mostrará un análisis que recomienda APROBAR
+
+### Personalización
+
+Puedes personalizar el procesamiento de IA editando:
+
+- `lib/validation/ai-validation-service.ts` - Para modificar cómo se construyen los prompts, los modelos utilizados, y cómo se interpretan las respuestas
+- `lib/validation/software-validation.ts` - Para ajustar las preguntas y criterios de validación
